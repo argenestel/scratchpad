@@ -1,0 +1,26 @@
+# Optional env_file requires Docker Compose v2.24+.
+services:
+  doddled:
+    build: .
+    ports:
+      # Both ports intentionally bind to localhost for local single-user access.
+      # Keep 1455 on localhost: ChatGPT OAuth uses the fixed redirect URI
+      # http://localhost:1455/auth/callback.
+      # Remote hosts: use device-code login, or tunnel both app and callback:
+      # ssh -L 1455:localhost:1455 -L 3000:localhost:3000 host
+      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:1455:1455"
+    volumes:
+      - doddled-data:/data
+      # Optional: import credentials from an existing Codex sign-in.
+      # - ${HOME}/.codex/auth.json:/codex/auth.json:ro
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      # CODEX_AUTH_FILE: /codex/auth.json
+    restart: unless-stopped
+
+volumes:
+  doddled-data:

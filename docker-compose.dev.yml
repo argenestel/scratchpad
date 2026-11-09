@@ -1,0 +1,55 @@
+# Run with: docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+services:
+  # Exclude the production service from normal dev startup to avoid port clashes.
+  doddled:
+    profiles: [production]
+
+  server:
+    build:
+      context: .
+      target: server-dev
+    working_dir: /app/server
+    command:
+      - sh
+      - -c
+      - if [ -f package-lock.json ]; then npm ci; else npm install; fi && npm run dev
+    ports:
+      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:1455:1455"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      NODE_ENV: development
+      PORT: "3000"
+      DATA_DIR: /data
+      # Override the production APP_URL from .env for Vite's session redirect.
+      APP_URL: http://localhost:5173
+      OAUTH_CALLBACK_PORT: "1455"
+    volumes:
+      - ./server:/app/server
+      - server-node-modules:/app/server/node_modules
+      - doddled-data:/data
+      # - ${HOME}/.codex/auth.json:/codex/auth.json:ro
+    # For Codex import, also set CODEX_AUTH_FILE=/codex/auth.json in .env.
+
+  web:
+    image: node:22-bookworm-slim
+    working_dir: /app/web
+    command:
+      - sh
+      - -c
+      - if [ -f package-lock.json ]; then npm ci; else npm install; fi && npm run dev -- --host
+    ports:
+      - "127.0.0.1:5173:5173"
+    environment:
+      VITE_API_PROXY: http://server:3000
+    volumes:
+      - ./web:/app/web
+      - web-node-modules:/app/web/node_modules
+    depends_on:
+      - server
+
+volumes:
+  server-node-modules:
+  web-node-modules:
