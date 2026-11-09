@@ -28,6 +28,7 @@ export function NoteView({ noteId, riddlers, onChanged, onDeleted, onOpenRiddler
   const [selection, setSelection] = useState<{ text: string; start: number; end: number; x: number; y: number } | null>(null);
   const [quote, setQuote] = useState<string | null>(null);
   const [prompt, setPrompt] = useState('');
+  const [composerOpen, setComposerOpen] = useState(false);
   const [action, setAction] = useState<AskAction>('ask');
   const [askAs, setAskAs] = useState<string | null>(null);
   const [purposeOpen, setPurposeOpen] = useState(false);
@@ -272,13 +273,32 @@ export function NoteView({ noteId, riddlers, onChanged, onDeleted, onOpenRiddler
   const submit = () => {
     if (!prompt.trim() && !quote) return;
     void ask(action, prompt.trim(), quote, askAs);
-    setPrompt(''); setQuote(null); setAction('ask');
+    setPrompt(''); setQuote(null); setAction('ask'); setComposerOpen(false);
     if (composerRef.current) composerRef.current.style.height = 'auto';
   };
 
+  const openComposer = () => { setComposerOpen(true); window.setTimeout(() => composerRef.current?.focus(), 0); };
+  const closeComposer = () => { setComposerOpen(false); setQuote(null); taRef.current?.focus(); };
+
+  // ⌘K / Ctrl+K opens the ask box (with the current selection, if any).
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        const ta = taRef.current;
+        const sel = ta && document.activeElement === ta ? ta.value.slice(ta.selectionStart, ta.selectionEnd).trim() : '';
+        if (sel) setQuote(sel);
+        setSelection(null);
+        openComposer();
+      }
+    };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, []);
+
   const quick = (act: AskAction) => {
     if (!selection) return;
-    if (act === 'ask') { setQuote(selection.text); setAction('ask'); setSelection(null); composerRef.current?.focus(); return; }
+    if (act === 'ask') { setQuote(selection.text); setAction('ask'); setSelection(null); openComposer(); return; }
     void ask(act, '', selection.text, askAs);
     setSelection(null);
   };
@@ -422,7 +442,13 @@ export function NoteView({ noteId, riddlers, onChanged, onDeleted, onOpenRiddler
         </div>
 
         <div className="composer-wrap">
-          <div className="composer">
+          {!composerOpen ? (
+            <button className="ask-fab" onClick={openComposer} aria-label="Ask doddled">
+              <I.chat /> Ask doddled <kbd>{navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} K</kbd>
+            </button>
+          ) : (
+          <div className="composer" onKeyDown={(e) => { if (e.key === 'Escape') closeComposer(); }}
+            onBlur={(e) => { if (!prompt.trim() && !quote && !e.currentTarget.contains(e.relatedTarget as Node) && !document.querySelector('.popover')) setComposerOpen(false); }}>
             {quote && <div className="sel-quote"><span>“{quote}”</span><button className="icon-btn" style={{ width: 24, height: 24 }} onClick={() => setQuote(null)} aria-label="Clear selection"><I.x size={13} /></button></div>}
             <div className="composer-row">
               <textarea ref={composerRef} rows={1} value={prompt}
@@ -450,8 +476,10 @@ export function NoteView({ noteId, riddlers, onChanged, onDeleted, onOpenRiddler
                   </div>
                 )}
               </Popover>
+              <button className="icon-btn" style={{ width: 26, height: 26 }} onClick={closeComposer} aria-label="Close ask box" title="Close (Esc)"><I.x size={13} /></button>
             </div>
           </div>
+          )}
         </div>
       </div>
 
