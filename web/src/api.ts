@@ -19,12 +19,13 @@ export type Annotation = {
 };
 export type AskAction = 'ask' | 'explain' | 'draw' | 'question';
 
+type RunTag = { runId?: string; annotationId?: string; riddlerId?: string | null };
 export type StreamEvent =
-  | { type: 'status'; state: 'thinking' | 'writing' | 'drawing' | 'idle'; riddlerId?: string | null; label?: string; annotationId?: string }
-  | { type: 'thinking'; delta: string; annotationId?: string; riddlerId?: string | null }
-  | { type: 'text'; delta: string; annotationId?: string; riddlerId?: string | null }
-  | { type: 'annotation'; annotation: Annotation }
-  | { type: 'error'; error: string }
+  | ({ type: 'status'; state: 'thinking' | 'writing' | 'drawing' | 'idle'; label?: string; silent?: boolean } & RunTag)
+  | ({ type: 'thinking'; delta: string } & RunTag)
+  | ({ type: 'text'; delta: string } & RunTag)
+  | ({ type: 'annotation'; annotation: Annotation } & RunTag)
+  | ({ type: 'error'; error: string } & RunTag)
   | { type: 'done' }
   | { type: 'ping' };
 

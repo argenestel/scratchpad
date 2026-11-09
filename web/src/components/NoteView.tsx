@@ -5,7 +5,6 @@ import { AnnotationCard, type Live } from './AnnotationCard';
 import { PurposeModal } from './PurposeModal';
 
 type LiveEntry = Live & { anchor: string | null; riddlerId: string | null; kind: Annotation['kind'] };
-type AgentStatus = { state: Live['state']; label?: string; thinking: string; riddlerId?: string | null };
 
 const ACTIONS: { id: AskAction; label: string; icon: keyof typeof ICONS }[] = [
   { id: 'ask', label: 'Ask', icon: 'chat' },
@@ -23,7 +22,7 @@ export function NoteView({ noteId, riddlers, onChanged, onDeleted, onOpenRiddler
   const [note, setNote] = useState<Note | null>(null);
   const [anns, setAnns] = useState<Annotation[]>([]);
   const [live, setLive] = useState<Record<string, LiveEntry>>({});
-  const [agent, setAgent] = useState<AgentStatus | null>(null);
+  const [caretY, setCaretY] = useState(0);
   const [saving, setSaving] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [hot, setHot] = useState<string | null>(null);
   const [selection, setSelection] = useState<{ text: string; start: number; end: number; x: number; y: number } | null>(null);
@@ -54,39 +53,44 @@ export function NoteView({ noteId, riddlers, onChanged, onDeleted, onOpenRiddler
   // ---------- load ----------
   useEffect(() => {
     let alive = true;
-    setNote(null); setAnns([]); setLive({}); setAgent(null);
+    setNote(null); setAnns([]); setLive({});
     api.note(noteId).then((r) => { if (alive) { setNote(r.note); setAnns(r.annotations); } })
       .catch((e) => toast(e.message, 'error'));
     return () => { alive = false; };
   }, [noteId]);
 
   // ---------- stream event reducer (shared by ask + background) ----------
+  // Live cards are keyed per run: an explicit ask uses its pending key; background jobs use
+  // runId (v2 server), else annotationId, else one slot per riddler/read-along agent.
   const handle = useCallback((e: StreamEvent, pendingKey?: string) => {
-    const key = pendingKey ?? ('annotationId' in e ? e.annotationId : undefined);
-    const rid = 'riddlerId' in e ? e.riddlerId ?? null : null;
+    if (e.type === 'done' || e.type === 'ping') return;
+    const rid = e.riddlerId ?? (e.type === 'annotation' ? e.annotation.riddlerId : null) ?? null;
+    const key = pendingKey ?? e.runId ?? e.annotationId ?? `bg:${rid ?? 'doddled'}`;
+    const blank = (state: Live['state']): LiveEntry => ({ state, thinking: '', text: '', anchor: null, riddlerId: rid, kind: 'comment', startedAt: Date.now() });
+    const drop = (keys: (string | undefined)[]) => setLive((l) => {
+      const c = { ...l }; let changed = false;
+      for (const k of keys) if (k && c[k]) { delete c[k]; changed = true; }
+      return changed ? c : l;
+    });
     switch (e.type) {
       case 'status':
-        if (key) {
-          setLive((l) => {
-            if (e.state === 'idle') { const { [key]: _, ...rest } = l; return rest; }
-            const cur = l[key] ?? { state: e.state, thinking: '', text: '', anchor: null, riddlerId: rid, kind: 'comment' as const };
-            return { ...l, [key]: { ...cur, state: e.state, label: e.label ?? cur.label, riddlerId: cur.riddlerId ?? rid } };
-          });
+        if (e.state === 'idle') {
+          if (e.silent) {
+            setLive((l) => (l[key] ? { ...l, [key]: { ...l[key], state: 'idle', silent: true } } : l));
+            window.setTimeout(() => drop([key]), 2600);
+          } else drop([key]);
+          break;
         }
-        if (!pendingKey) setAgent((a) => (e.state === 'idle' ? null : { state: e.state, label: e.label, thinking: a?.thinking ?? '', riddlerId: rid }));
+        setLive((l) => {
+          const cur = l[key] ?? blank(e.state);
+          return { ...l, [key]: { ...cur, state: e.state, label: e.label ?? cur.label, riddlerId: cur.riddlerId ?? rid } };
+        });
         break;
       case 'thinking':
-        if (key) setLive((l) => {
-          const cur = l[key] ?? { state: 'thinking' as const, thinking: '', text: '', anchor: null, riddlerId: rid, kind: 'comment' as const };
-          return { ...l, [key]: { ...cur, thinking: cur.thinking + e.delta } };
-        });
-        if (!pendingKey) setAgent((a) => ({ state: a?.state ?? 'thinking', label: a?.label, riddlerId: a?.riddlerId ?? rid, thinking: ((a?.thinking ?? '') + e.delta).slice(-600) }));
+        setLive((l) => { const cur = l[key] ?? blank('thinking'); return { ...l, [key]: { ...cur, thinking: cur.thinking + e.delta } }; });
         break;
       case 'text':
-        if (key) setLive((l) => {
-          const cur = l[key] ?? { state: 'writing' as const, thinking: '', text: '', anchor: null, riddlerId: rid, kind: 'comment' as const };
-          return { ...l, [key]: { ...cur, state: 'writing', text: cur.text + e.delta } };
-        });
+        setLive((l) => { const cur = l[key] ?? blank('writing'); return { ...l, [key]: { ...cur, state: 'writing', text: cur.text + e.delta } }; });
         break;
       case 'annotation':
         setAnns((xs) => {
@@ -94,13 +98,11 @@ export function NoteView({ noteId, riddlers, onChanged, onDeleted, onOpenRiddler
           if (i === -1) return [...xs, e.annotation];
           const c = xs.slice(); c[i] = e.annotation; return c;
         });
-        setLive((l) => { const c = { ...l }; delete c[e.annotation.id]; if (pendingKey) delete c[pendingKey]; return c; });
-        if (!pendingKey) setAgent(null);
+        drop([e.annotation.id, key, pendingKey, `bg:${e.annotation.riddlerId ?? 'doddled'}`]);
         break;
       case 'error':
         toast(e.error, 'error');
-        if (pendingKey) setLive((l) => { const c = { ...l }; delete c[pendingKey]; return c; });
-        if (!pendingKey) setAgent(null);
+        drop([key]);
         break;
     }
   }, []);
@@ -211,6 +213,7 @@ export function NoteView({ noteId, riddlers, onChanged, onDeleted, onOpenRiddler
       let y = Number.POSITIVE_INFINITY;
       if (m) y = base + m.offsetTop - 6;
       else if (r) y = base + measure(r.start).top - 6;
+      else if (live[a.id] && !a.anchor) y = base + caretY - 6; // read-along run: beside where you're writing
       return { id: a.id, y, order: i };
     });
     // Unanchored notes go at the top, in arrival order.
@@ -240,6 +243,7 @@ export function NoteView({ noteId, riddlers, onChanged, onDeleted, onOpenRiddler
     const ta = taRef.current; if (!ta) return;
     const { selectionStart: s, selectionEnd: e } = ta;
     const text = ta.value.slice(s, e);
+    setCaretY(measure(s).top);
     if (e - s < 2 || !text.trim()) { setSelection(null); return; }
     const a = measure(s); const b = measure(e);
     const y = a.top;
@@ -252,7 +256,7 @@ export function NoteView({ noteId, riddlers, onChanged, onDeleted, onOpenRiddler
     const n = noteRef.current; if (!n) return;
     await flush();
     const key = `pending:${++pendingN.current}`;
-    setLive((l) => ({ ...l, [key]: { state: 'thinking', thinking: '', text: '', anchor: sel && n.content.includes(sel) ? sel : null, riddlerId, kind: KIND_FOR[act], label: act === 'draw' ? 'Sketching' : 'Thinking' } }));
+    setLive((l) => ({ ...l, [key]: { state: 'thinking', thinking: '', text: '', anchor: sel && n.content.includes(sel) ? sel : null, riddlerId, kind: KIND_FOR[act], label: act === 'draw' ? 'Sketching' : 'Thinking', startedAt: Date.now() } }));
     askAbort.current?.abort();
     const ac = new AbortController(); askAbort.current = ac;
     const defaults: Record<AskAction, string> = { ask: 'What do you think?', explain: 'Explain this.', draw: 'Draw this.', question: 'Ask me a question that tests whether I understand this.' };
@@ -295,6 +299,9 @@ export function NoteView({ noteId, riddlers, onChanged, onDeleted, onOpenRiddler
 
   if (!note) return <div className="main"><div className="topbar">{sidebarToggle}</div><div className="center-load">Opening…</div></div>;
 
+  const working = Object.entries(live)
+    .filter(([k, l]) => !k.startsWith('pending:') && l.state !== 'idle')
+    .map(([, l]) => ({ who: l.riddlerId ? riddlerById[l.riddlerId]?.name ?? 'Riddler' : 'doddled', color: riddlerById[l.riddlerId ?? '']?.color ?? note.inkColor, state: l.state }));
   const selRiddlers = new Set(note.riddlerIds);
   const askAsRiddler = askAs ? riddlerById[askAs] : undefined;
 
@@ -306,12 +313,11 @@ export function NoteView({ noteId, riddlers, onChanged, onDeleted, onOpenRiddler
           <button role="radio" aria-checked={note.mode === 'thinks'} className={note.mode === 'thinks' ? 'on' : ''} onClick={() => setMode('thinks')}>Thinks with you</button>
           <button role="radio" aria-checked={note.mode === 'ask'} className={note.mode === 'ask' ? 'on' : ''} onClick={() => setMode('ask')}>When you ask</button>
         </div>
-        {agent && (
-          <span className="status-pill" title={agent.thinking}>
-            <span className="pulse" style={{ background: riddlerById[agent.riddlerId ?? '']?.color ?? note.inkColor }} />
-            <span className="txt">
-              <span className="shimmer">{agent.riddlerId ? `${riddlerById[agent.riddlerId]?.name ?? 'Riddler'} is ${agent.state}` : agent.label ?? (agent.state === 'thinking' ? 'Reading along' : agent.state)}</span>
-              {agent.thinking && <span style={{ color: 'var(--text-3)' }}> · {lastLine(agent.thinking)}</span>}
+        {working.length > 0 && (
+          <span className="status-pill" title={working.map((w) => w.who).join(', ')}>
+            <span className="pulse" style={{ background: working[0].color }} />
+            <span className="txt shimmer">
+              {working.length === 1 ? `${working[0].who} is ${working[0].state === 'writing' ? 'writing' : working[0].state === 'drawing' ? 'sketching' : 'thinking'}` : `${working.length} agents working`}
             </span>
           </span>
         )}
@@ -384,7 +390,7 @@ export function NoteView({ noteId, riddlers, onChanged, onDeleted, onOpenRiddler
               <div className="mirror" ref={measureRef} aria-hidden style={{ visibility: 'hidden' }} />
               <textarea ref={taRef} value={note.content} spellCheck
                 placeholder={note.mode === 'thinks' ? 'Start writing. doddled will read along…' : 'Start writing. Select text or use the box below to ask doddled.'}
-                onChange={(e) => { update({ content: e.target.value }, { nudge: true }); setSelection(null); }}
+                onChange={(e) => { update({ content: e.target.value }, { nudge: true }); setSelection(null); setCaretY(measure(e.target.selectionStart).top); }}
                 onSelect={onSelect} onBlur={() => window.setTimeout(() => setSelection((s) => (document.activeElement === taRef.current ? s : null)), 150)} />
               {selection && (
                 <div className="sel-bar" style={{ left: selection.x, top: selection.y }} onMouseDown={(e) => e.preventDefault()}>
@@ -452,9 +458,4 @@ export function NoteView({ noteId, riddlers, onChanged, onDeleted, onOpenRiddler
       {purposeOpen && <PurposeModal value={note.purpose} onClose={() => setPurposeOpen(false)} onSave={(p: string) => { update({ purpose: p }, { immediate: true }); setPurposeOpen(false); }} />}
     </div>
   );
-}
-
-function lastLine(s: string) {
-  const t = s.trim().split(/\n+/).pop() ?? '';
-  return t.replace(/\*\*/g, '').slice(-90);
 }

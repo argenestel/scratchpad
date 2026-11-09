@@ -299,3 +299,9 @@ a { color: inherit; }
 :root[data-theme='dark'] .ink, :root[data-theme='dark'] .ann-head .kind, :root[data-theme='dark'] .drawing text { color: color-mix(in srgb, var(--c, var(--ink)) 55%, #fff); fill: color-mix(in srgb, var(--c, var(--ink)) 55%, #fff); }
 :root[data-theme='dark'] .drawing path { stroke: color-mix(in srgb, var(--c, var(--ink)) 55%, #fff); }
 :root[data-theme='dark'] .editor .mirror mark { box-shadow: 0 2px 0 -0.5px color-mix(in srgb, var(--ul-c, var(--ink)) 60%, #fff); }
+
+.clamp { max-height: 176px; overflow: hidden; }
+.clamp.open { max-height: none; }
+.clamp.faded { -webkit-mask-image: linear-gradient(to bottom, #000 72%, transparent); mask-image: linear-gradient(to bottom, #000 72%, transparent); }
+.more-btn { display: block; border: 0; background: transparent; color: var(--text-3); font-size: 12px; padding: 2px 0; margin-top: 2px; }
+.more-btn:hover { color: var(--text); }

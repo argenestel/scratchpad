@@ -1,9 +1,19 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, type Annotation, type Riddler } from '../api';
 import { I, Markdown, timeAgo, toast } from '../ui';
 import { DrawingView } from './DrawingView';
 
-export type Live = { state: 'thinking' | 'writing' | 'drawing' | 'idle'; thinking: string; text: string; label?: string };
+export type Live = { state: 'thinking' | 'writing' | 'drawing' | 'idle'; thinking: string; text: string; label?: string; startedAt: number; silent?: boolean };
+
+function useElapsed(since: number | undefined, running: boolean) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (!running) return;
+    const t = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, [running]);
+  return since ? Math.max(0, Math.round((now - since) / 1000)) : 0;
+}
 
 const KIND: Record<Annotation['kind'], string> = { question: 'Question', explain: 'Explains', drawing: 'Sketch', comment: 'Note' };
 
@@ -20,6 +30,27 @@ export function Thinking({ text, live, label }: { text: string | null | undefine
   );
 }
 
+/** Collapse long margin notes so they don't push later notes far away from their anchors. */
+function Clamp({ enabled, children }: { enabled: boolean; children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [overflows, setOverflows] = useState(false);
+  useEffect(() => {
+    const el = ref.current; if (!el) return;
+    const check = () => setOverflows(el.scrollHeight > el.clientHeight + 4);
+    check();
+    const ro = new ResizeObserver(check); ro.observe(el);
+    return () => ro.disconnect();
+  }, [children, open]);
+  if (!enabled) return <>{children}</>;
+  return (
+    <>
+      <div ref={ref} className={`clamp ${open ? 'open' : ''} ${overflows && !open ? 'faded' : ''}`}>{children}</div>
+      {(overflows || open) && <button className="more-btn" onClick={() => setOpen((o) => !o)}>{open ? 'Show less' : 'Show more'}</button>}
+    </>
+  );
+}
+
 export function AnnotationCard({ a, live, riddler, inkColor, onHover, onUpdate, onRemove }: {
   a: Annotation; live?: Live; riddler?: Riddler; inkColor: string;
   onHover: (id: string | null) => void; onUpdate: (a: Annotation) => void; onRemove: (id: string) => void;
@@ -30,6 +61,7 @@ export function AnnotationCard({ a, live, riddler, inkColor, onHover, onUpdate, 
   const [showReply, setShowReply] = useState(false);
   const abortRef = useRef<AbortController>();
   const streaming = !!live && live.state !== 'idle';
+  const elapsed = useElapsed(live?.startedAt, streaming);
   const body = streaming ? live.text : a.body;
 
   const send = async () => {
@@ -60,10 +92,10 @@ export function AnnotationCard({ a, live, riddler, inkColor, onHover, onUpdate, 
     <div className="ann-card" style={{ ['--c' as string]: color }}
       onMouseEnter={() => onHover(a.id)} onMouseLeave={() => onHover(null)}>
       <div className="ann-head">
-        <span className="kind">{streaming && !body ? (live.state === 'drawing' ? 'Sketching' : 'Thinking') : KIND[a.kind]}</span>
+        <span className="kind">{streaming ? (live.state === 'drawing' ? 'Sketching' : live.state === 'writing' ? 'Writing' : 'Thinking') : live?.silent ? 'Read along' : KIND[a.kind]}</span>
         {riddler && <span className="who">{riddler.name}</span>}
-        {!streaming && <span>{timeAgo(a.createdAt)}</span>}
-        {!streaming && (
+        {streaming ? <span>{elapsed}s</span> : !live && <span>{timeAgo(a.createdAt)}</span>}
+        {!live && (
           <span className="acts">
             {a.status === 'open'
               ? <button className="icon-btn" title="Resolve" aria-label="Resolve" onClick={() => setStatus('resolved')}><I.check /></button>
@@ -74,10 +106,15 @@ export function AnnotationCard({ a, live, riddler, inkColor, onHover, onUpdate, 
       </div>
       {a.anchor && <p className="ann-anchor">“{a.anchor}”</p>}
 
-      <Thinking text={streaming ? live.thinking : a.thinking} live={streaming && !body} label={live?.label} />
+      {live?.silent && <div className="ink" style={{ opacity: 0.7 }}>Nothing worth adding yet. Keep going.</div>}
+      <Thinking text={live ? live.thinking : a.thinking} live={streaming && !body} label={live?.label} />
 
       {a.drawing && !streaming && <DrawingView drawing={a.drawing} color={color} />}
-      {(body || streaming) && <div className="ink"><Markdown text={body} caret={streaming && live.state === 'writing'} /></div>}
+      {(body || streaming) && (
+        <Clamp enabled={!streaming}>
+          <div className="ink"><Markdown text={body} caret={streaming && live.state === 'writing'} /></div>
+        </Clamp>
+      )}
 
       {(a.replies.length > 0 || replyLive) && (
         <div className="replies">
@@ -94,7 +131,7 @@ export function AnnotationCard({ a, live, riddler, inkColor, onHover, onUpdate, 
         </div>
       )}
 
-      {!streaming && (showReply || a.replies.length > 0 ? (
+      {!live && (showReply || a.replies.length > 0 ? (
         <div className="reply-box">
           <textarea rows={1} value={reply} placeholder="Reply…" autoFocus={showReply && a.replies.length === 0}
             onChange={(e) => { setReply(e.target.value); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
