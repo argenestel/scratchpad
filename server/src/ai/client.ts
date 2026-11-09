@@ -17,6 +17,7 @@ export async function response(
   let res: Response;
   for (;;) {
     const headers = authHeaders(credentials);
+    await emit('status', { state: 'thinking', phase: 'thinking' });
     res = await fetch(
       credentials.authMethod === 'chatgpt'
         ? 'https://chatgpt.com/backend-api/codex/responses'
@@ -82,6 +83,10 @@ export async function response(
       if (!text) {
         for (const o of e.response?.output || [])
           for (const c of o.content || []) if (c.type === 'output_text') text += c.text;
+        if (text) {
+          await emit('status', { state: 'writing' });
+          await emit('text', { delta: text });
+        }
       }
     } else if (['response.failed', 'response.incomplete', 'error'].includes(e.type))
       throw new Error('AI response could not be completed');

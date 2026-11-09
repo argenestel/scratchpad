@@ -95,7 +95,9 @@ globalThis.fetch = async (url, init) => {
   const data = JSON.parse(String(init?.body));
   assert.equal(data.stream, true);
   assert.equal(data.store, false);
-  assert.ok(data.instructions);
+  assert.match(data.instructions, /GFM Markdown/);
+  assert.match(data.instructions, /language tag/);
+  assert.match(data.instructions, /stateDiagram-v2/);
   assert.deepEqual(data.include, ['reasoning.encrypted_content']);
   assert.equal(data.model, expectedModel);
   assert.deepEqual(data.reasoning, expectedReasoning);
@@ -138,6 +140,25 @@ function events(raw: string) {
           .slice(5),
       ),
     }));
+}
+
+function checkStatuses(
+  received: ReturnType<typeof events>,
+  model = expectedModel,
+  effort = expectedReasoning.effort,
+) {
+  const statuses = received.filter((e) => e.event === 'status');
+  assert.ok(statuses.length >= 2);
+  assert.equal(received[0].event, 'status');
+  assert.equal(statuses[0].data.state, 'thinking');
+  assert.equal(statuses[0].data.phase, 'reading');
+  for (const { data } of statuses) {
+    assert.equal(data.model, model);
+    assert.equal(data.effort, effort);
+    assert.ok(['reading', 'thinking', 'writing', 'drawing', 'done'].includes(data.phase));
+  }
+  assert.equal(statuses.at(-1)!.data.phase, 'done');
+  checks++;
 }
 
 async function request(
@@ -318,6 +339,13 @@ try {
       )
     ).text(),
   );
+  checkStatuses(answer);
+  assert.equal(answer[1].data.phase, 'thinking');
+  assert.equal(
+    answer.find((e) => e.event === 'text')!.data.delta,
+    'What assumption would change your conclusion?',
+  );
+  assert.equal(answer.at(-3)!.data.phase, 'done');
   const annotation = answer.find((e) => e.event === 'annotation')!.data.annotation;
   assert.equal(annotation.anchor, null);
   assert.equal(annotation.kind, 'question');
@@ -326,7 +354,7 @@ try {
   await request(base, '/api/settings', 'PATCH', { summary: 'off' }, cookie);
   expectedReasoning = { effort: 'high' };
   modelOutputs.push('Check it with a small counterexample.');
-  const thread = events(
+  const replyEvents = events(
     await (
       await request(
         base,
@@ -336,7 +364,9 @@ try {
         cookie,
       )
     ).text(),
-  ).find((e) => e.event === 'annotation')!.data.annotation;
+  );
+  checkStatuses(replyEvents);
+  const thread = replyEvents.find((e) => e.event === 'annotation')!.data.annotation;
   assert.deepEqual(
     thread.replies.map((r: any) => r.role),
     ['user', 'ai'],
@@ -355,8 +385,46 @@ try {
       },
     ],
   };
-  modelOutputs.push('invalid JSON', JSON.stringify(drawing));
-  const drawn = events(
+  const mermaid =
+    'Request flow:\n\n```mermaid\nsequenceDiagram\n  Client->>Server: Request\n  Server-->>Client: Response\n```';
+  modelOutputs.push(mermaid);
+  const diagramEvents = events(
+    await (
+      await request(
+        base,
+        `/api/notes/${note.id}/ask`,
+        'POST',
+        {
+          prompt: 'Draw the client/server request sequence',
+          selection: '*_`Edited by the writer`_*',
+          action: 'draw',
+        },
+        cookie,
+      )
+    ).text(),
+  );
+  checkStatuses(diagramEvents);
+  const diagram = diagramEvents.find((e) => e.event === 'annotation')!.data.annotation;
+  assert.equal(diagram.kind, 'explain');
+  assert.equal(diagram.body, mermaid);
+  assert.equal(diagram.drawing, null);
+  assert.equal(diagram.anchor, 'Edited by the writer');
+  assert.equal(
+    diagramEvents
+      .filter((e) => e.event === 'text')
+      .map((e) => e.data.delta)
+      .join(''),
+    mermaid,
+  );
+  checks++;
+  const { normalizeAnchor } = await import('../src/store.js');
+  assert.equal(normalizeAnchor('**literal** and code', '**literal**'), '**literal**');
+  assert.equal(normalizeAnchor('plain code', '`code`'), 'code');
+  assert.equal(normalizeAnchor('plain code', '**absent**'), null);
+  assert.equal(normalizeAnchor('plain code', '***'), null);
+  checks++;
+  modelOutputs.push('```mermaid\nunsupportedDiagram\n```', JSON.stringify(drawing));
+  const drawnEvents = events(
     await (
       await request(
         base,
@@ -366,7 +434,10 @@ try {
         cookie,
       )
     ).text(),
-  ).find((e) => e.event === 'annotation')!.data.annotation;
+  );
+  checkStatuses(drawnEvents);
+  assert.ok(drawnEvents.some((e) => e.event === 'status' && e.data.phase === 'drawing'));
+  const drawn = drawnEvents.find((e) => e.event === 'annotation')!.data.annotation;
   assert.equal(drawn.kind, 'drawing');
   assert.deepEqual(drawn.drawing, drawing);
   modelOutputs.push('invalid JSON', 'still invalid');
@@ -416,6 +487,7 @@ try {
         assert.equal(event.data.runId, runId, `${event.event} missing stable runId`);
       }
       assert.equal(received.at(-1)!.data.state, 'idle');
+      checkStatuses(received);
       checks++;
       return { received, result: await res.json() };
     } finally {
@@ -428,7 +500,7 @@ try {
     JSON.stringify({
       speak: true,
       kind: 'question',
-      anchor: 'Edited by the writer',
+      anchor: '**Edited by the writer**',
       body: 'What evidence supports this?',
       drawing: null,
     }),
@@ -442,6 +514,7 @@ try {
   );
   assert.ok(riddled.received.some((e) => e.event === 'annotation'));
   const finalRiddle = riddled.received.find((e) => e.event === 'annotation')!.data;
+  assert.equal(finalRiddle.annotation.anchor, 'Edited by the writer');
   for (const event of riddled.received) {
     assert.equal(event.data.riddlerId, builtins[0].id);
     assert.equal(event.data.annotationId, finalRiddle.annotation.id);
@@ -496,12 +569,27 @@ try {
   assert.equal(finalNudge.annotationId, finalNudge.annotation.id);
   assert.equal(spoken.received.at(-1)!.data.annotationId, finalNudge.annotation.id);
   assert.equal(spoken.received.at(-1)!.data.silent, undefined);
-  expectedModel = 'smoke-default';
+  expectedModel = 'reader-model';
+  modelOutputs.push(
+    JSON.stringify({
+      speak: true,
+      kind: 'explain',
+      anchor: null,
+      body: 'Review with background preferences.',
+      drawing: null,
+    }),
+  );
+  const overriddenRiddle = await background(`/api/notes/${note.id}/riddle`, { riddlerIds: [builtins[0].id] });
+  assert.equal(
+    overriddenRiddle.received.find((e) => e.event === 'annotation')!.data.annotation.body,
+    'Review with background preferences.',
+  );
   modelOutputs.push(500);
   const failedRun = await background(`/api/notes/${note.id}/riddle`, { riddlerIds: [builtins[0].id] });
   assert.equal(failedRun.received.at(-2)!.event, 'error');
   assert.ok(failedRun.received.at(-2)!.data.error);
   assert.equal(failedRun.received.at(-1)!.data.silent, undefined);
+  expectedModel = 'smoke-default';
   await request(base, `/api/annotations/${annotation.id}`, 'DELETE', undefined, cookie);
 
   const credsFile = path.join(tmp, 'codex-auth.json');

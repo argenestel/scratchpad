@@ -34,9 +34,15 @@ export function getAnnotation(uid: string, id: string): Annotation {
     missing()
   );
 }
+export function normalizeAnchor(content: string, value: string | null): string | null {
+  if (!value) return null;
+  if (content.includes(value)) return value;
+  const stripped = value.replace(/^[*_`]+|[*_`]+$/g, '');
+  return stripped && content.includes(stripped) ? stripped : null;
+}
 export function putAnnotation(uid: string, a: Annotation) {
   const note = getNote(uid, a.noteId);
-  if (a.anchor && !note.content.includes(a.anchor)) a.anchor = null;
+  a.anchor = normalizeAnchor(note.content, a.anchor);
   db.prepare(
     'INSERT INTO annotations(id,user_id,note_id,data) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data WHERE annotations.user_id=excluded.user_id',
   ).run(a.id, uid, a.noteId, JSON.stringify(a));

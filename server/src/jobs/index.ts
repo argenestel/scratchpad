@@ -3,6 +3,8 @@ import { config } from '../config.js';
 import { db } from '../db.js';
 import * as store from '../store.js';
 import { review } from '../ai/engine.js';
+import { aiOptions } from '../settings.js';
+import { statusEmitter } from '../ai/status.js';
 import type { Emit } from '../types.js';
 type Job = { uid: string; noteId: string; riddlerId?: string; nudge: boolean };
 const queue: Job[] = [],
@@ -77,13 +79,17 @@ async function run(j: Job) {
   const runId = randomUUID();
   let annotationId: string | undefined;
   let silent = j.nudge;
-  const emit: Emit = (event, data) =>
-    publish(uid, noteId, event, {
-      ...data,
-      runId,
-      ...(j.riddlerId ? { riddlerId: j.riddlerId } : {}),
-      ...(annotationId ? { annotationId } : {}),
-    });
+  const options = await aiOptions(uid, true);
+  const emit: Emit = statusEmitter(
+    (event, data) =>
+      publish(uid, noteId, event, {
+        ...data,
+        runId,
+        ...(j.riddlerId ? { riddlerId: j.riddlerId } : {}),
+        ...(annotationId ? { annotationId } : {}),
+      }),
+    options,
+  );
   try {
     const note = store.getNote(uid, noteId),
       hash = createHash('sha256').update(note.content).digest('hex');
@@ -103,11 +109,12 @@ async function run(j: Job) {
     }
     await emit('status', {
       state: 'thinking',
+      phase: 'reading',
       riddlerId: j.riddlerId ?? null,
       label: riddler?.name ?? 'Reading along',
       ...(annotationId ? { annotationId } : {}),
     });
-    const result = await review(uid, note, riddler, emit, placeholder);
+    const result = await review(uid, note, riddler, emit, placeholder, options);
     const current = store.getNote(uid, noteId);
     if (j.nudge && (current.content !== note.content || current.mode !== 'thinks')) return;
     if (result) {

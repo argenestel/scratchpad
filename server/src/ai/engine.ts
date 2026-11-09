@@ -2,8 +2,16 @@ import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { aiOptions } from '../settings.js';
 import { response } from './client.js';
+import { statusEmitter } from './status.js';
 import { drawingRules, drawingDescription, instructions, reviewRules } from './prompts.js';
-import { drawingSchema, type Note, type Riddler, type Emit, type Annotation } from '../types.js';
+import {
+  drawingSchema,
+  type Note,
+  type Riddler,
+  type Emit,
+  type Annotation,
+  type AIOptions,
+} from '../types.js';
 import * as store from '../store.js';
 export function extractJSON(text: string): unknown {
   try {
@@ -48,7 +56,7 @@ function context(uid: string, note: Note) {
   });
 }
 function anchor(note: Note, value: string | null) {
-  return value && note.content.includes(value) ? value : null;
+  return store.normalizeAnchor(note.content, value);
 }
 // Decode only a complete prefix of the JSON body string, including split escapes.
 function partialBody(json: string): string {
@@ -92,8 +100,9 @@ export async function review(
   riddler: Riddler | undefined,
   emit: Emit,
   annotation?: Annotation,
+  resolvedOptions?: AIOptions,
 ): Promise<Annotation | null> {
-  const options = await aiOptions(uid, !riddler);
+  const options = resolvedOptions ?? (await aiOptions(uid, true));
   let currentAnnotationId = annotation?.id;
   const emitTagged: Emit = async (event, data) => {
     await emit(event, {
@@ -116,7 +125,8 @@ export async function review(
           : '') +
         (attempt ? '\nYour prior output was invalid. Return valid JSON matching the exact schema.' : ''),
       async (event, data) => {
-        if (event === 'thinking') await emitTagged(event, data);
+        if (event === 'thinking' || (event === 'status' && data.state === 'thinking'))
+          await emitTagged(event, data);
         if (event === 'text') {
           incoming += String(data.delta || '');
           if (/"speak"\s*:\s*true/.test(incoming)) {
@@ -140,6 +150,7 @@ export async function review(
       if (!d.speak) {
         if (!annotation) return null;
         const body = d.body || 'No new concerns to add from this perspective.';
+        await emitTagged('status', { state: 'writing' });
         await emitTagged('text', { delta: body });
         return { ...annotation, body, thinking: thinking || null };
       }
@@ -203,7 +214,8 @@ export async function ask(
       : data.action === 'question'
         ? 'question'
         : 'comment';
-  await emit('status', { state: draw ? 'drawing' : 'thinking', riddlerId: riddler?.id ?? null });
+  emit = statusEmitter(emit, options, { riddlerId: riddler?.id ?? null });
+  await emit('status', { state: 'thinking', phase: 'reading' });
   let thinking = '';
   for (let attempt = 0; attempt < 2; attempt++) {
     const result = await response(
@@ -211,26 +223,41 @@ export async function ask(
       instructions(note, riddler) +
         (draw
           ? '\n' + drawingRules
-          : '\nRespond directly in concise markdown. If a drawing would help, output ONLY a Drawing JSON object instead. ' +
+          : '\nRespond directly in concise markdown. Prefer Mermaid in the Markdown body for technical diagrams. For other visuals, if an ink drawing would help, output ONLY a Drawing JSON object instead. ' +
             drawingDescription +
             ' Otherwise answer in markdown.'),
       context(uid, note) +
         '\n' +
         JSON.stringify(data) +
-        (attempt ? '\nThe prior drawing was invalid. Return only valid Drawing JSON.' : ''),
+        (attempt
+          ? '\nThe prior output was invalid. Return valid Drawing JSON, or Markdown containing a fenced mermaid block for a system/flow/sequence diagram.'
+          : ''),
       async (event, value) => {
-        if (event === 'thinking' || !draw) await emit(event, { ...value, annotationId: a.id });
+        if (event === 'thinking' || !draw || (event === 'status' && value.state === 'thinking'))
+          await emit(event, { ...value, annotationId: a.id });
       },
       options,
       undefined,
       signal,
     );
     thinking += result.thinking;
+    const mermaid =
+      /(?:^|\n)```mermaid[^\S\r\n]*\r?\n\s*(?:flowchart\b|sequenceDiagram\b|stateDiagram-v2\b|erDiagram\b|classDiagram\b)[\s\S]+?\r?\n```(?:\s|$)/.test(
+        result.text,
+      );
+    if (draw && mermaid) {
+      a.kind = 'explain';
+      a.body = result.text;
+      await emit('status', { state: 'writing' });
+      await emit('text', { delta: a.body, annotationId: a.id });
+      break;
+    }
     const isDrawing =
       draw || (/^[\s`]*(?:json\s*)?\{/.test(result.text) && /"(?:viewBox|steps)"/.test(result.text));
     if (isDrawing) {
       try {
         a.drawing = drawingSchema.parse(extractJSON(result.text));
+        await emit('status', { state: 'drawing' });
         a.kind = 'drawing';
         a.body = '';
         break;
@@ -238,6 +265,7 @@ export async function ask(
         if (attempt === 1) {
           a.kind = 'comment';
           a.body = 'I could not prepare a valid drawing. Try a more specific drawing request.';
+          await emit('status', { state: 'writing' });
           await emit('text', { delta: a.body, annotationId: a.id });
         }
       }
@@ -248,16 +276,17 @@ export async function ask(
   }
   a.thinking = thinking || null;
   store.putAnnotation(uid, a);
+  await emit('status', { state: 'idle', phase: 'done' });
   await emit('annotation', { annotation: a });
-  await emit('status', { state: 'idle' });
 }
 export async function reply(uid: string, a: Annotation, text: string, emit: Emit, signal?: AbortSignal) {
   const options = await aiOptions(uid);
   const note = store.getNote(uid, a.noteId),
     riddler = a.riddlerId ? store.riddlers(uid).find((r) => r.id === a.riddlerId) : undefined;
+  emit = statusEmitter(emit, options, { riddlerId: a.riddlerId });
+  await emit('status', { state: 'thinking', phase: 'reading' });
   a.replies.push({ id: randomUUID(), role: 'user', body: text, thinking: null, createdAt: Date.now() });
   store.putAnnotation(uid, a);
-  await emit('status', { state: 'thinking', riddlerId: a.riddlerId });
   const result = await response(
     uid,
     instructions(note, riddler) +
@@ -279,6 +308,6 @@ export async function reply(uid: string, a: Annotation, text: string, emit: Emit
     createdAt: Date.now(),
   });
   store.putAnnotation(uid, latest);
+  await emit('status', { state: 'idle', phase: 'done' });
   await emit('annotation', { annotation: latest });
-  await emit('status', { state: 'idle' });
 }
