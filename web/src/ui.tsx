@@ -30,6 +30,15 @@ export const I = {
   terminal: P(<><rect x="3" y="4" width="18" height="16" rx="3" /><path d="m7 9 3 3-3 3M13 15h4" /></>),
   device: P(<><rect x="6" y="2" width="12" height="20" rx="3" /><path d="M11 18h2" /></>),
   sliders: P(<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0M14 4v4M8 10v4M16 16v4" />),
+  list: P(<path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01" />),
+  listOrdered: P(<path d="M10 6h10M10 12h10M10 18h10M4 5l1.5-1v5M3.5 14.5c.5-1 2.5-1 2.5.4 0 1.1-2.5 2.1-2.5 3.1H6" />),
+  checkSquare: P(<><rect x="3.5" y="3.5" width="17" height="17" rx="4" /><path d="m8 12 3 3 5-6" /></>),
+  code: P(<path d="m8 8-4 4 4 4M16 8l4 4-4 4M13.5 5l-3 14" />),
+  quote: P(<path d="M7 7h4v4c0 3-2 5-4 6M15 7h4v4c0 3-2 5-4 6" />),
+  minus: P(<path d="M5 12h14" />),
+  panel: P(<><rect x="3" y="4" width="18" height="16" rx="3" /><path d="M15 4v16" /></>),
+  copy: P(<><rect x="8" y="8" width="12" height="12" rx="3" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></>),
+  sparkle: P(<path d="M12 3c.6 4.2 2.8 6.4 7 7-4.2.6-6.4 2.8-7 7-.6-4.2-2.8-6.4-7-7 4.2-.6 6.4-2.8 7-7zM19 16c.2 1.5 1 2.3 2.5 2.5-1.5.2-2.3 1-2.5 2.5-.2-1.5-1-2.3-2.5-2.5 1.5-.2 2.3-1 2.5-2.5z" />),
   stop: P(<rect x="7" y="7" width="10" height="10" rx="2" />),
 };
 
