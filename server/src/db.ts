@@ -5,7 +5,11 @@ import { config } from './config.js';
 // Renamed from doddled.db: keep using an existing legacy database file if present.
 const legacy = path.join(config.dataDir, 'doddled.db');
 const current = path.join(config.dataDir, 'scratchpad.db');
-if (!fs.existsSync(current) && fs.existsSync(legacy)) fs.renameSync(legacy, current);
+if (!fs.existsSync(current) && fs.existsSync(legacy)) {
+  // Move the WAL/SHM side files too, or un-checkpointed writes would be lost.
+  for (const suffix of ['-wal', '-shm']) if (fs.existsSync(legacy + suffix)) fs.renameSync(legacy + suffix, current + suffix);
+  fs.renameSync(legacy, current);
+}
 export const db = new Database(current);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
