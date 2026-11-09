@@ -1,0 +1,34 @@
+name = "scratchpad"
+main = "src/index.ts"
+compatibility_date = "2026-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = "../web/dist"
+not_found_handling = "single-page-application"
+binding = "ASSETS"
+run_worker_first = ["/api/*"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "scratchpad"
+# Paste the database id returned by `wrangler d1 create scratchpad` here.
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+[[durable_objects.bindings]]
+name = "NOTE_ROOM"
+class_name = "NoteRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["NoteRoom"]
+
+[vars]
+DEFAULT_MODEL = "gpt-6.1-sol"
+REASONING_EFFORT = "medium"
+REASONING_SUMMARY = "concise"
+JOB_CONCURRENCY = "3"
+
+# Required: wrangler secret put APP_SECRET
+# Optional: wrangler secret put OPENAI_API_KEY

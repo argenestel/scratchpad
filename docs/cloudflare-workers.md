@@ -21,18 +21,21 @@ Objects enabled. From the repository root:
 
 ```sh
 npm ci --prefix web
-npm ci --prefix worker
+npm install --prefix worker
 npm run build --prefix web
 cd worker
 npx wrangler login
 npx wrangler d1 create scratchpad
 ```
 
+`worker/package-lock.json` is committed; use `npm ci --prefix worker` for reproducible installs.
+Wrangler is pinned to `4.158.0`.
+
 Copy the returned database UUID into the `database_id` of the `DB` binding in
 `worker/wrangler.toml`, replacing its placeholder. Keep `database_name = "scratchpad"`.
-Configure `APP_URL` in the same file to the final HTTPS origin (your Worker URL
-or custom domain). Defaults for `DEFAULT_MODEL`, `REASONING_EFFORT`, and
-`REASONING_SUMMARY` are also configured there.
+Defaults for `DEFAULT_MODEL`, `REASONING_EFFORT`, and `REASONING_SUMMARY` are also
+configured there. The Worker uses the request origin for cookie security; the
+Node server's `APP_URL` setting is not required.
 
 Set a stable random secret of at least 32 characters when prompted:
 
@@ -69,8 +72,8 @@ npx wrangler dev
 ```
 
 Local D1 and Durable Object state are separate from production. Open Wrangler's
-local URL; use the local HTTP origin for `APP_URL` when testing locally. The
-frontend and API share an origin, including the signed `dd_session` cookie.
+local URL. The frontend and API share an origin, including the signed
+`dd_session` cookie.
 
 ```sh
 npm run typecheck
@@ -78,10 +81,10 @@ npm test
 npx wrangler deploy --dry-run
 ```
 
-Tests use Vitest with `@cloudflare/vitest-pool-workers`, exercising the Workers
-runtime and local D1/Durable Object bindings. A dry run bundles the Worker and
-assets without publishing. It does not validate production credentials or prove
-that live ChatGPT sign-in/provider calls work.
+`npm test` runs the integration suite inside the real Workers runtime (workerd) via
+`@cloudflare/vitest-plugin`, with local D1 and Durable Object bindings and a stubbed
+AI provider (no network). A dry run bundles the Worker and assets without publishing;
+it does not validate production credentials or live ChatGPT sign-in/provider calls.
 
 ## Auth, state, and streaming
 
@@ -111,14 +114,17 @@ quotas. See [Workers limits](https://developers.cloudflare.com/workers/platform/
 
 ## GitHub Actions
 
-[The deployment workflow](../.github/workflows/deploy-cloudflare.yml) runs on pushes
-to `main` affecting `worker/**`, `web/**`, shared `server/src/ai/**`, or the workflow,
-and supports manual `workflow_dispatch`. It installs locked dependencies, builds
-the web app, checks/types/tests the Worker, applies remote D1 migrations, then
-deploys. Production deployments are serialized.
+[The workflow](../.github/workflows/deploy-cloudflare.yml) has two jobs:
 
-Before enabling it, configure the database ID, provision Worker application
-secrets with Wrangler as above, and add these repository Actions secrets:
+- **check** runs on every push/PR touching `worker/**`, `web/**` or `server/src/**`:
+  `npm ci`, web build, typecheck, workerd tests and a Wrangler dry run.
+- **deploy** runs after `check` on `main`, **only when the repository variable
+  `CLOUDFLARE_DEPLOY` is `true`**. It applies remote D1 migrations and deploys.
+  Production deploys are serialized.
+
+To enable deploys: configure the database ID, provision Worker secrets with Wrangler,
+add the two Actions secrets below, then set **Settings → Secrets and variables →
+Actions → Variables → `CLOUDFLARE_DEPLOY` = `true`**.
 
 - `CLOUDFLARE_ACCOUNT_ID`: the destination account ID.
 - `CLOUDFLARE_API_TOKEN`: an account-scoped token with **Workers Scripts: Edit**,

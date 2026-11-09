@@ -34,6 +34,18 @@ http://localhost:3000. Device login avoids the OAuth callback tunnel; remote
 access still needs a tunnel or configured exposure for the app itself. Set
 `APP_URL` to the URL your browser uses when changing the deployment.
 
+## Deploy
+
+| Option | What runs | Data | Sign-in | Guide |
+| --- | --- | --- | --- | --- |
+| Docker (local) | Node + SQLite container | Docker volume | Browser OAuth, device code, Codex import | Quick start above |
+| Cloudflare Tunnel | Same container, exposed on your domain | Docker volume on your machine/VPS | Device code (browser OAuth only on localhost) | [docs/cloudflare-tunnel.md](docs/cloudflare-tunnel.md) |
+| Cloudflare Workers | Serverless Worker + D1 + Durable Objects | D1 | Device code, optional API key | [docs/cloudflare-workers.md](docs/cloudflare-workers.md) |
+
+The Workers build lives in `worker/` and serves the same API contract and the same web build.
+CI typechecks and tests it in workerd on every push; deploys run once you set the
+`CLOUDFLARE_DEPLOY` repository variable and Cloudflare secrets.
+
 ## Architecture
 
 The Vite React frontend builds to `web/dist`. A Node 22 TypeScript server using
