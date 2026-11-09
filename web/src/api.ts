@@ -17,6 +17,9 @@ export type Annotation = {
   id: string; noteId: string; kind: AnnotationKind; anchor: string | null; body: string; drawing: Drawing | null;
   riddlerId: string | null; thinking: string | null; status: 'open' | 'resolved' | 'dismissed'; replies: Reply[]; createdAt: number;
 };
+export type ModelInfo = { id: string; name: string; description: string; defaultEffort: string; efforts: string[] };
+export type Summary = 'concise' | 'detailed' | 'auto' | 'off';
+export type Settings = { model: string; effort: string; summary: Summary; backgroundModel: string | null; backgroundEffort: string | null };
 export type AskAction = 'ask' | 'explain' | 'draw' | 'question';
 
 type RunTag = { runId?: string; annotationId?: string; riddlerId?: string | null };
@@ -96,6 +99,10 @@ export const api = {
   codexImport: () => req<{ user: User }>('POST', '/api/auth/codex-import'),
   apiKey: () => req<{ user: User }>('POST', '/api/auth/apikey'),
   logout: () => req<{ ok: true }>('POST', '/api/auth/logout'),
+
+  models: () => req<{ models: ModelInfo[]; source: 'live' | 'fallback' }>('GET', '/api/models'),
+  settings: () => req<{ settings: Settings }>('GET', '/api/settings'),
+  patchSettings: (b: Partial<Settings>) => req<{ settings: Settings }>('PATCH', '/api/settings', b),
 
   notes: () => req<{ notes: NoteSummary[] }>('GET', '/api/notes'),
   createNote: (b: Partial<Pick<Note, 'title' | 'content' | 'mode' | 'purpose'>> = {}) => req<{ note: Note }>('POST', '/api/notes', b),

@@ -3,6 +3,7 @@ import { api, type AuthMethods, type Note, type NoteSummary, type Riddler, type 
 import { NoteView } from './components/NoteView';
 import { RiddlersModal } from './components/RiddlersModal';
 import { Sidebar } from './components/Sidebar';
+import { SettingsModal } from './components/SettingsModal';
 import { SignIn } from './components/SignIn';
 import { I, Toaster, toast } from './ui';
 
@@ -48,6 +49,7 @@ function Workspace({ user, onSignedOut }: { user: User; onSignedOut: () => void 
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [riddlersOpen, setRiddlersOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [theme, toggleTheme] = useTheme();
 
   useEffect(() => {
@@ -99,10 +101,10 @@ function Workspace({ user, onSignedOut }: { user: User; onSignedOut: () => void 
     <div className={`shell ${collapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}>
       {mobileOpen && <div className="scrim only-mobile" style={{ zIndex: 39, display: 'block' }} onClick={() => setMobileOpen(false)} />}
       <Sidebar notes={notes ?? []} activeId={active} user={user} onOpen={(id) => open(id)} onNew={create}
-        onRiddlers={() => setRiddlersOpen(true)} onLogout={logout} theme={theme} onTheme={toggleTheme} onCollapse={() => { setCollapsed(true); setMobileOpen(false); }} />
+        onRiddlers={() => setRiddlersOpen(true)} onSettings={() => setSettingsOpen(true)} onLogout={logout} theme={theme} onTheme={toggleTheme} onCollapse={() => { setCollapsed(true); setMobileOpen(false); }} />
       {active ? (
         <NoteView key={active} noteId={active} riddlers={riddlers} sidebarToggle={toggle}
-          onOpenRiddlers={() => setRiddlersOpen(true)}
+          onOpenRiddlers={() => setRiddlersOpen(true)} onOpenSettings={() => setSettingsOpen(true)}
           onChanged={(n, count) => setNotes((ns) => {
             const list = ns ?? []; const s = toSummary(n, count);
             const i = list.findIndex((x) => x.id === n.id);
@@ -122,6 +124,7 @@ function Workspace({ user, onSignedOut }: { user: User; onSignedOut: () => void 
           </div>
         </div>
       )}
+      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} onChange={() => window.dispatchEvent(new Event('dd:settings'))} />}
       {riddlersOpen && <RiddlersModal riddlers={riddlers} onChange={setRiddlers} onClose={() => setRiddlersOpen(false)} />}
     </div>
   );

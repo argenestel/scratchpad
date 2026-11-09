@@ -2,9 +2,9 @@ import { useMemo, useState } from 'react';
 import type { NoteSummary, User } from '../api';
 import { I, Popover, timeAgo } from '../ui';
 
-export function Sidebar({ notes, activeId, user, onOpen, onNew, onRiddlers, onLogout, theme, onTheme, onCollapse }: {
+export function Sidebar({ notes, activeId, user, onOpen, onNew, onRiddlers, onSettings, onLogout, theme, onTheme, onCollapse }: {
   notes: NoteSummary[]; activeId: string | null; user: User; onOpen: (id: string) => void; onNew: () => void;
-  onRiddlers: () => void; onLogout: () => void; theme: 'light' | 'dark'; onTheme: () => void; onCollapse: () => void;
+  onRiddlers: () => void; onSettings: () => void; onLogout: () => void; theme: 'light' | 'dark'; onTheme: () => void; onCollapse: () => void;
 }) {
   const [q, setQ] = useState('');
   const filtered = useMemo(() => {
@@ -25,6 +25,7 @@ export function Sidebar({ notes, activeId, user, onOpen, onNew, onRiddlers, onLo
       <div className="search"><I.search /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search notes" aria-label="Search notes" /></div>
       <nav className="note-list">
         <button className="note-item" onClick={onRiddlers}><div className="t"><I.users /> Riddlers</div></button>
+        <button className="note-item" onClick={onSettings}><div className="t"><I.sliders /> Models &amp; thinking</div></button>
         <div className="list-label">Notes</div>
         {filtered.length === 0 && <div style={{ padding: '6px 10px', color: 'var(--text-3)', fontSize: 13 }}>{q ? 'No matches' : 'No notes yet'}</div>}
         {filtered.map((n) => (
@@ -43,6 +44,7 @@ export function Sidebar({ notes, activeId, user, onOpen, onNew, onRiddlers, onLo
         <Popover align="right" up trigger={(t) => <button className="icon-btn" onClick={t} aria-label="Account"><I.more /></button>}>
           {(close) => (
             <div>
+              <button className="menu-item" onClick={() => { onSettings(); close(); }}><I.sliders /> Settings</button>
               <button className="menu-item" onClick={() => { onTheme(); close(); }}>{theme === 'dark' ? <I.sun /> : <I.moon />} {theme === 'dark' ? 'Light' : 'Dark'} paper</button>
               <div className="menu-sep" />
               <button className="menu-item danger" onClick={onLogout}><I.logout /> Sign out</button>

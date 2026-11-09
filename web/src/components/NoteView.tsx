@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { api, type Annotation, type AskAction, type Mode, type Note, type Riddler, type StreamEvent } from '../api';
+import { api, type Annotation, type AskAction, type Mode, type ModelInfo, type Note, type Riddler, type Settings, type StreamEvent } from '../api';
 import { I, INKS, Popover, toast } from '../ui';
 import { AnnotationCard, type Live } from './AnnotationCard';
 import { PurposeModal } from './PurposeModal';
@@ -15,9 +15,9 @@ const ACTIONS: { id: AskAction; label: string; icon: keyof typeof ICONS }[] = [
 const ICONS = { chat: I.chat, bulb: I.bulb, draw: I.draw, question: I.question };
 const KIND_FOR: Record<AskAction, Annotation['kind']> = { ask: 'comment', explain: 'explain', draw: 'drawing', question: 'question' };
 
-export function NoteView({ noteId, riddlers, onChanged, onDeleted, onOpenRiddlers, sidebarToggle }: {
+export function NoteView({ noteId, riddlers, onChanged, onDeleted, onOpenRiddlers, onOpenSettings, sidebarToggle }: {
   noteId: string; riddlers: Riddler[]; onChanged: (n: Note, annotationCount: number) => void; onDeleted: () => void;
-  onOpenRiddlers: () => void; sidebarToggle: React.ReactNode;
+  onOpenRiddlers: () => void; onOpenSettings: () => void; sidebarToggle: React.ReactNode;
 }) {
   const [note, setNote] = useState<Note | null>(null);
   const [anns, setAnns] = useState<Annotation[]>([]);
@@ -29,6 +29,17 @@ export function NoteView({ noteId, riddlers, onChanged, onDeleted, onOpenRiddler
   const [quote, setQuote] = useState<string | null>(null);
   const [prompt, setPrompt] = useState('');
   const [composerOpen, setComposerOpen] = useState(false);
+  const [ai, setAi] = useState<{ settings: Settings; model?: ModelInfo } | null>(null);
+
+  // Current model + thinking level, shown in the ask box; refreshed when Settings changes.
+  useEffect(() => {
+    const load = () => Promise.all([api.settings(), api.models()])
+      .then(([s, m]) => setAi({ settings: s.settings, model: m.models.find((x) => x.id === s.settings.model) }))
+      .catch(() => {});
+    void load();
+    window.addEventListener('dd:settings', load);
+    return () => window.removeEventListener('dd:settings', load);
+  }, []);
   const [action, setAction] = useState<AskAction>('ask');
   const [askAs, setAskAs] = useState<string | null>(null);
   const [purposeOpen, setPurposeOpen] = useState(false);
@@ -462,6 +473,11 @@ export function NoteView({ noteId, riddlers, onChanged, onDeleted, onOpenRiddler
                 <button key={a.id} className={`chip ${action === a.id ? 'on' : ''}`} onClick={() => setAction(a.id)}><Ic size={13} /> {a.label}</button>
               ); })}
               <span style={{ flex: 1 }} />
+              {ai && (
+                <button className="chip model-chip" onClick={onOpenSettings} title="Model & thinking">
+                  <I.sliders size={13} /> {ai.model?.name ?? ai.settings.model} · {ai.settings.effort}
+                </button>
+              )}
               <Popover align="right" up trigger={(t) => (
                 <button className="chip" onClick={t}><span className="dot" style={{ background: askAsRiddler?.color ?? note.inkColor }} />{askAsRiddler?.name ?? 'doddled'}</button>
               )}>

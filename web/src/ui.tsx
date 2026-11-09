@@ -29,6 +29,7 @@ export const I = {
   key: P(<><circle cx="8" cy="15" r="4" /><path d="m11 12 9-9M17 6l3 3M15 8l2 2" /></>),
   terminal: P(<><rect x="3" y="4" width="18" height="16" rx="3" /><path d="m7 9 3 3-3 3M13 15h4" /></>),
   device: P(<><rect x="6" y="2" width="12" height="20" rx="3" /><path d="M11 18h2" /></>),
+  sliders: P(<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0M14 4v4M8 10v4M16 16v4" />),
   stop: P(<rect x="7" y="7" width="10" height="10" rx="2" />),
 };
 
