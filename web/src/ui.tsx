@@ -42,6 +42,21 @@ export const I = {
   stop: P(<rect x="7" y="7" width="10" height="10" rx="2" />),
 };
 
+/** scratchpad mark: a pad with a pen scribble. */
+export function Logo({ size = 22 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 32 32" width={size} height={size} aria-hidden className="logo">
+      <rect x="3" y="3" width="26" height="26" rx="7" fill="var(--text)" />
+      <path d="M9 11h9M9 15.5h14M9 20h6" stroke="var(--paper)" strokeWidth="2" strokeLinecap="round" opacity=".55" />
+      <path d="M17.5 22.5c2-3.2 3.6-5 5-5 1 0 .8 1.6-.4 2.8" fill="none" stroke="var(--ink)" strokeWidth="2.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function Wordmark({ size = 22 }: { size?: number }) {
+  return <span className="wordmark" style={{ fontSize: size * 0.82 }}><Logo size={size} />scratchpad</span>;
+}
+
 export function OpenAIMark({ size = 18 }: { size?: number }) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor" aria-hidden>

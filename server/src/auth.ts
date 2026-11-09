@@ -186,7 +186,7 @@ export function registerAuth(app: Hono<Env>) {
   app.get('/api/auth/me', async (c) =>
     c.json({
       user: await current(c),
-      methods: { browser: true, device: true, codexImport: canImport(), apiKey: !!config.apiKey },
+      methods: { browser: browserOAuthUsable(), device: true, codexImport: canImport(), apiKey: !!config.apiKey },
     }),
   );
   app.post('/api/auth/chatgpt/start', async (c) => {
@@ -414,4 +414,17 @@ export function startCallbackListener() {
   });
   server.listen(config.callbackPort, '0.0.0.0');
   return server;
+}
+
+/**
+ * ChatGPT browser OAuth redirects to the fixed http://localhost:1455/auth/callback, so it only
+ * works when the app itself is opened on localhost. Public deployments (tunnel, VPS) use device code.
+ */
+function browserOAuthUsable() {
+  try {
+    const host = new URL(config.appUrl).hostname;
+    return host === 'localhost' || host === '127.0.0.1' || host === '[::1]';
+  } catch {
+    return true;
+  }
 }

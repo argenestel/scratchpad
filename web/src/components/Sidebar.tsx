@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { NoteSummary, User } from '../api';
-import { I, Popover, timeAgo } from '../ui';
+import { I, Popover, timeAgo, Wordmark } from '../ui';
 
 export function Sidebar({ notes, activeId, user, onOpen, onNew, onRiddlers, onSettings, onLogout, theme, onTheme, onCollapse }: {
   notes: NoteSummary[]; activeId: string | null; user: User; onOpen: (id: string) => void; onNew: () => void;
@@ -16,7 +16,7 @@ export function Sidebar({ notes, activeId, user, onOpen, onNew, onRiddlers, onSe
   return (
     <aside className="sidebar">
       <div className="sidebar-top">
-        <span className="wordmark">scratchpad<i>.</i></span>
+        <Wordmark />
         <div style={{ display: 'flex' }}>
           <button className="icon-btn" onClick={onNew} aria-label="New note" title="New note (⌘⇧O)"><I.pen /></button>
           <button className="icon-btn" onClick={onCollapse} aria-label="Hide sidebar"><I.sidebar /></button>

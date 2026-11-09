@@ -26,7 +26,7 @@ services:
     image: cloudflare/cloudflared:2025.11.1
     command: tunnel --no-autoupdate run
     environment:
-      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
     profiles: [tunnel]
     depends_on:
       - scratchpad
