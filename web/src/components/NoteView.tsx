@@ -271,7 +271,15 @@ export function NoteView({ noteId, riddlers, onChanged, onDeleted, onOpenRiddler
     setFlash(a.id);
     window.setTimeout(() => setFlash((f) => (f === a.id ? null : f)), 1600);
   };
-  const upsert = (u: Annotation) => setAnns((xs) => xs.map((x) => (x.id === u.id ? u : x)));
+  const upsert = (u: Annotation) => {
+    setAnns((xs) => xs.map((x) => (x.id === u.id ? u : x)));
+    // A note marked done leaves the text, so drop it from an open popover instead of leaving it floating.
+    if (u.status !== 'open') setPop((p) => {
+      if (!p?.ids?.includes(u.id)) return p;
+      const ids = p.ids.filter((i) => i !== u.id);
+      return ids.length ? { ...p, ids } : null;
+    });
+  };
   const removeAnn = (id: string) => { setAnns((xs) => xs.filter((x) => x.id !== id)); setPop((p) => (p?.ids?.includes(id) ? null : p)); };
 
   const liveRuns = Object.values(runs).filter((r) => r.key !== palette?.runKey && r.key !== pop?.runKey);
@@ -425,7 +433,7 @@ export function NoteView({ noteId, riddlers, onChanged, onDeleted, onOpenRiddler
             <div className="panel-head">
               <div className="tabs">
                 <button className={panelTab === 'open' ? 'on' : ''} onClick={() => setPanelTab('open')}>Open <span>{openAnns.length}</span></button>
-                <button className={panelTab === 'resolved' ? 'on' : ''} onClick={() => setPanelTab('resolved')}>Resolved <span>{resolvedAnns.length}</span></button>
+                <button className={panelTab === 'resolved' ? 'on' : ''} onClick={() => setPanelTab('resolved')}>Done <span>{resolvedAnns.length}</span></button>
               </div>
               <button className="icon-btn" onClick={() => setPanelOpen(false)} aria-label="Close panel"><I.x /></button>
             </div>
@@ -453,7 +461,7 @@ export function NoteView({ noteId, riddlers, onChanged, onDeleted, onOpenRiddler
                     ? note.mode === 'thinks'
                       ? <>scratchpad is reading along. Notes show up here and as highlights in your text.</>
                       : <>Select text and choose <b>Explain</b>, <b>Diagram</b> or <b>Quiz</b>, or press <kbd>⌘K</kbd>.</>
-                    : 'Nothing resolved yet.'}
+                    : 'Notes you mark done land here. Reopen one to show it in the text again.'}
                 </div>
               )}
             </div>

@@ -58,7 +58,7 @@ a { color: inherit; }
 .btn:active { transform: translateY(1px); }
 .btn:disabled { opacity: .5; cursor: default; }
 .btn.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
-.btn.primary:hover { opacity: .9; }
+.btn.primary:hover { background: color-mix(in srgb, var(--accent) 88%, var(--paper)); }
 .btn.ghost { background: transparent; border-color: transparent; }
 .btn.ghost:hover { background: var(--paper-2); }
 .btn.sm { height: 28px; padding: 0 10px; font-size: 13px; }
@@ -123,7 +123,7 @@ a { color: inherit; }
 .sidebar-foot .who span { font-size: 11.5px; color: var(--text-3); }
 
 .main { min-width: 0; display: flex; flex-direction: column; height: 100%; overflow: hidden; }
-.topbar { height: 52px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 14px; border-bottom: 1px solid var(--rule); background: color-mix(in srgb, var(--paper) 88%, transparent); backdrop-filter: blur(8px); }
+.topbar { height: 52px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 14px; border-bottom: 1px solid var(--rule); background: var(--paper);  }
 .topbar .spacer { flex: 1; }
 .seg { display: inline-flex; padding: 3px; background: var(--paper-2); border-radius: 999px; border: 1px solid var(--rule); }
 .seg button { border: 0; background: transparent; height: 26px; padding: 0 12px; border-radius: 999px; font-size: 13px; color: var(--text-2); font-weight: 500; }
@@ -169,7 +169,6 @@ a { color: inherit; }
 .ann-card { background: var(--sheet); border: 1px solid var(--rule); border-radius: 12px; padding: 12px 14px 12px; box-shadow: var(--shadow); position: relative; }
 .ann-card::before { content: ''; position: absolute; left: -1px; top: 12px; bottom: 12px; width: 3px; border-radius: 3px; background: var(--c, var(--ink)); }
 .ann.hot .ann-card { border-color: color-mix(in srgb, var(--c, var(--ink)) 50%, var(--rule)); }
-.ann.resolved .ann-card { opacity: .6; }
 .ann-head { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-3); margin-bottom: 4px; }
 .ann-head .kind { font-weight: 600; color: var(--c, var(--ink)); text-transform: uppercase; letter-spacing: .06em; font-size: 10.5px; }
 .ann-head .who { color: var(--text-2); font-weight: 500; }
@@ -245,7 +244,7 @@ a { color: inherit; }
 .swatch { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--sheet); box-shadow: 0 0 0 1px var(--rule-2); }
 .swatch.on { box-shadow: 0 0 0 2px var(--text); }
 
-.scrim { position: fixed; inset: 0; z-index: 50; background: rgba(20, 18, 14, .38); display: grid; place-items: center; padding: 16px; animation: fadein .12s ease-out; }
+.scrim { position: fixed; inset: 0; z-index: 50; background: transparent; display: grid; place-items: center; padding: 16px;  }
 .modal { width: min(560px, 100%); max-height: calc(100vh - 32px); overflow: auto; background: var(--sheet); border-radius: 18px; box-shadow: var(--shadow-lg); border: 1px solid var(--rule); }
 .modal.wide { width: min(980px, 100%); }
 .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px 6px; }
@@ -302,7 +301,6 @@ a { color: inherit; }
 
 .clamp { max-height: 176px; overflow: hidden; }
 .clamp.open { max-height: none; }
-.clamp.faded { -webkit-mask-image: linear-gradient(to bottom, #000 72%, transparent); mask-image: linear-gradient(to bottom, #000 72%, transparent); }
 .more-btn { display: block; border: 0; background: transparent; color: var(--text-3); font-size: 12px; padding: 2px 0; margin-top: 2px; }
 .more-btn:hover { color: var(--text); }
 
@@ -470,7 +468,6 @@ button.prop:hover { background: var(--paper-2); }
 /* AI note */
 .note-ai { display: grid; gap: 8px; }
 .note-ai + .note-ai { border-top: 1px solid var(--rule); padding-top: 14px; margin-top: 6px; }
-.note-ai.resolved { opacity: .65; }
 .note-ai-head { display: flex; align-items: center; gap: 7px; font-size: 13px; }
 .note-ai-head b { font-weight: 600; }
 .note-ai-head .kind { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--c); }
@@ -479,7 +476,7 @@ button.prop:hover { background: var(--paper-2); }
 .note-ai-head .acts .icon-btn { width: 28px; height: 28px; }
 .anchor-quote { text-align: left; border: 0; border-left: 2px solid var(--c); background: color-mix(in srgb, var(--c) 7%, transparent); padding: 4px 10px; border-radius: 0 6px 6px 0; font-size: 12.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .anchor-quote:not(:disabled):hover { color: var(--text); }
-.clampable.clamped { max-height: 150px; overflow: hidden; -webkit-mask-image: linear-gradient(#000 70%, transparent); mask-image: linear-gradient(#000 70%, transparent); }
+.clampable.clamped { max-height: 150px; overflow: hidden; }
 .thread { display: grid; gap: 10px; border-top: 1px solid var(--rule); padding-top: 10px; }
 .msg.user { justify-self: end; max-width: 88%; background: var(--paper-2); padding: 7px 11px; border-radius: 12px 12px 4px 12px; font-size: 14px; white-space: pre-wrap; }
 .note-ai .reply-box { margin-top: 2px; }
@@ -525,7 +522,7 @@ button.prop:hover { background: var(--paper-2); }
 .panel-empty { color: var(--text-3); font-size: 13.5px; line-height: 1.55; padding: 18px 6px; text-align: center; }
 
 /* ask palette */
-.palette-scrim { align-items: start; padding-top: 12vh; background: rgba(20, 18, 14, .3); }
+.palette-scrim { align-items: start; padding-top: 12vh; background: transparent; }
 .palette { width: min(680px, 100%); max-height: 76vh; overflow-y: auto; background: var(--sheet); border: 1px solid var(--rule-2); border-radius: 16px; box-shadow: var(--shadow-lg); animation: pop-up .14s ease-out; }
 .palette-quote { display: flex; align-items: center; gap: 8px; margin: 12px 14px 0; padding: 6px 6px 6px 12px; border-left: 3px solid var(--ink); background: var(--paper); border-radius: 0 8px 8px 0; font-size: 13px; color: var(--text-2); }
 .palette-quote span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -635,3 +632,15 @@ button.prop:hover { background: var(--paper-2); }
 .pv-steps em { margin-left: auto; font-style: normal; font-family: var(--mono); font-size: 10.5px; color: var(--text-3); }
 @media (max-width: 960px) { .landing-main { grid-template-columns: 1fr; } .preview { display: none; } .features { grid-template-columns: 1fr; } }
 .doc.ProseMirror pre { white-space: pre; }
+
+/* No see-through surfaces: done notes stay fully opaque (muted header + tag instead of fading). */
+.note-ai.resolved .note-ai-head b, .note-ai.resolved .md { color: var(--text-2); }
+.done-tag { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); padding: 1px 7px; border-radius: 999px; }
+
+.toast { display: flex; align-items: center; gap: 14px; }
+.toast-action { border: 0; background: transparent; color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; padding: 0; }
+
+/* Overlays are fully opaque and appear instantly: no fades, tints or blur. Modals stand out by border and shadow. */
+.scrim > .modal, .palette { border: 1px solid var(--float-border); box-shadow: 0 0 0 1px rgba(0,0,0,.04), 0 24px 70px -10px rgba(0,0,0,.55); }
+.popover, .ann-pop, .palette, .modal, .slash-menu, .bubble, .toast, .composer { animation: none !important; opacity: 1 !important; }
+.seg button, .btn, .activity, .crumb { white-space: nowrap; }

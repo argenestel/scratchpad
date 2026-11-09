@@ -55,8 +55,11 @@ export function AnnotationView({ a, run, riddler, inkColor, compact, onUpdate, o
     }
   };
 
-  const setStatus = async (status: Annotation['status']) => {
-    try { onUpdate((await api.patchAnnotation(a.id, { status })).annotation); } catch (e) { toast((e as Error).message, 'error'); }
+  const setStatus = async (status: Annotation['status'], undoable = false) => {
+    try {
+      onUpdate((await api.patchAnnotation(a.id, { status })).annotation);
+      if (undoable) toast('Marked done. It is hidden from your text.', 'info', { label: 'Undo', run: () => void setStatus('open') });
+    } catch (e) { toast((e as Error).message, 'error'); }
   };
   const remove = async () => {
     try { await api.deleteAnnotation(a.id); onRemove(a.id); } catch (e) { toast((e as Error).message, 'error'); }
@@ -71,11 +74,12 @@ export function AnnotationView({ a, run, riddler, inkColor, compact, onUpdate, o
         <b>{who}</b>
         <span className="kind">{live ? 'working' : KIND_LABEL[a.kind]}</span>
         {!run && <span className="when">{timeAgo(a.createdAt)}</span>}
+        {a.status === 'resolved' && <span className="done-tag"><I.check size={11} /> Done</span>}
         {!run && (
           <span className="acts">
             {a.status === 'open'
-              ? <button className="icon-btn" title="Resolve" aria-label="Resolve" onClick={() => setStatus('resolved')}><I.check /></button>
-              : <button className="icon-btn" title="Reopen" aria-label="Reopen" onClick={() => setStatus('open')}><I.replay /></button>}
+              ? <button className="icon-btn" title="Done: hide it from the text (kept under Done)" aria-label="Mark done" onClick={() => setStatus('resolved', true)}><I.check /></button>
+              : <button className="icon-btn" title="Reopen: show it in the text again" aria-label="Reopen" onClick={() => setStatus('open')}><I.replay /></button>}
             <button className="icon-btn" title="Delete" aria-label="Delete" onClick={remove}><I.trash /></button>
           </span>
         )}

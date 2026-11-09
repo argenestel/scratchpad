@@ -152,18 +152,26 @@ export function timeAgo(ts: number) {
 
 export const INKS = ['#2b4acb', '#c2410c', '#0f766e', '#7c3aed', '#be123c', '#1f1c17'];
 
+type ToastAction = { label: string; run: () => void };
+type ToastData = { msg: string; kind: 'info' | 'error'; action?: ToastAction };
 let toastTimer: number | undefined;
-export function toast(msg: string, kind: 'info' | 'error' = 'info') {
-  window.dispatchEvent(new CustomEvent('dd:toast', { detail: { msg, kind } }));
+export function toast(msg: string, kind: 'info' | 'error' = 'info', action?: ToastAction) {
+  window.dispatchEvent(new CustomEvent<ToastData>('dd:toast', { detail: { msg, kind, action } }));
   window.clearTimeout(toastTimer);
-  toastTimer = window.setTimeout(() => window.dispatchEvent(new CustomEvent('dd:toast', { detail: null })), 3600);
+  toastTimer = window.setTimeout(() => window.dispatchEvent(new CustomEvent('dd:toast', { detail: null })), action ? 6000 : 3600);
 }
 export function Toaster() {
-  const [t, setT] = useState<{ msg: string; kind: string } | null>(null);
+  const [t, setT] = useState<ToastData | null>(null);
   useEffect(() => {
-    const h = (e: Event) => setT((e as CustomEvent).detail);
+    const h = (e: Event) => setT((e as CustomEvent<ToastData | null>).detail);
     window.addEventListener('dd:toast', h);
     return () => window.removeEventListener('dd:toast', h);
   }, []);
-  return t ? <div className={`toast ${t.kind === 'error' ? 'error' : ''}`} role="status">{t.msg}</div> : null;
+  if (!t) return null;
+  return (
+    <div className={`toast ${t.kind === 'error' ? 'error' : ''}`} role="status">
+      {t.msg}
+      {t.action && <button className="toast-action" onClick={() => { t.action!.run(); setT(null); }}>{t.action.label}</button>}
+    </div>
+  );
 }
