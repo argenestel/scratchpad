@@ -83,3 +83,28 @@ Endpoints:
 - `POST /api/notes/:id/nudge` `{}` → `{ queued: boolean }` — called by web (debounced ~4s idle) in `thinks` mode;
   background agent decides whether to speak up (may produce nothing). Server dedupes/coalesces per note.
 - `GET  /api/notes/:id/events` → long-lived SSE for background agents on that note: `status`, `thinking`, `text`, `annotation`, `ping` every 20s.
+
+## Settings & models (v2)
+```ts
+type Effort = string   // one of the chosen model's efforts, e.g. 'low'|'medium'|'high'|'xhigh'|'max'|'ultra'
+type ModelInfo = { id: string; name: string; description: string; defaultEffort: Effort; efforts: Effort[] }
+type Settings = {
+  model: string;                       // used for asks, replies, riddlers
+  effort: Effort;
+  summary: 'concise' | 'detailed' | 'auto' | 'off';   // reasoning summary streamed as "thinking"; off = no summary
+  backgroundModel: string | null;      // read-along agent; null = same as model
+  backgroundEffort: Effort | null;     // null = same as effort
+}
+```
+- `GET   /api/models` → `{ models: ModelInfo[], source: 'live' | 'fallback' }`
+  ChatGPT users: live from `https://chatgpt.com/backend-api/codex/models?client_version=…` (only `visibility: 'list'`),
+  cached ~10 min per user. API-key users / failures: fallback list built from `DEFAULT_MODEL`.
+- `GET   /api/settings` → `{ settings: Settings }` (per user; defaults from env `DEFAULT_MODEL`, `REASONING_EFFORT`, `REASONING_SUMMARY`)
+- `PATCH /api/settings` `Partial<Settings>` → `{ settings }`. Effort is clamped to the model's supported list (model default if unsupported).
+  All AI calls use the caller's settings (background jobs use backgroundModel/backgroundEffort when set).
+
+## Background stream identity (v2)
+Every event emitted by a background job on `GET /api/notes/:id/events` carries `runId: string` (stable for that job run),
+plus `riddlerId` when relevant and `annotationId` once known. The final `annotation` event also carries `runId`.
+When a read-along run decides to stay silent it ends with `status { state: 'idle', runId, silent: true }`.
+Every run ends with exactly one `status { state: 'idle', runId }`.
