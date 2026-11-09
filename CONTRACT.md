@@ -108,3 +108,15 @@ Every event emitted by a background job on `GET /api/notes/:id/events` carries `
 plus `riddlerId` when relevant and `annotationId` once known. The final `annotation` event also carries `runId`.
 When a read-along run decides to stay silent it ends with `status { state: 'idle', runId, silent: true }`.
 Every run ends with exactly one `status { state: 'idle', runId }`.
+
+## v3: markdown notes, dev-friendly output, richer status
+- `Note.content` is **Markdown** (GFM: headings, lists, task lists `- [ ]`, fenced code with language, quotes, inline code).
+  Existing plain-text notes are valid Markdown. `anchor` remains an exact substring of `content`; prefer anchoring on plain
+  prose or a single code line (no markdown syntax characters at the anchor edges).
+- AI `body` / reply text is GFM Markdown. Code uses fenced blocks with a language tag. For architecture, flows, sequences,
+  state machines and data models the AI should prefer a fenced ```mermaid block inside the body (rendered by the web UI)
+  over the ink `Drawing`; `action: 'draw'` still returns a `Drawing` unless the selection/prompt is clearly a system/flow
+  diagram, in which case it may return kind `explain` with a mermaid block.
+- Every `status` event (foreground and background) additionally carries `model: string` and `effort: string` (resolved
+  from settings) and, when `state` changes, `phase: 'reading' | 'thinking' | 'writing' | 'drawing' | 'done'`.
+  Foreground streams emit `status { state:'thinking', phase:'reading' }` immediately on request receipt.
