@@ -94,7 +94,7 @@ export function registerAI(app: Hono<Env>) {
       }, 20000);
       s.onAbort(finish);
       try {
-        await emit('status', { state: 'idle' });
+        await emit('ping', {});
         await done;
       } finally {
         clearInterval(timer);

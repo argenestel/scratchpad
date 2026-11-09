@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
+import { aiOptions } from '../settings.js';
 import { response } from './client.js';
 import { drawingRules, drawingDescription, instructions, reviewRules } from './prompts.js';
 import { drawingSchema, type Note, type Riddler, type Emit, type Annotation } from '../types.js';
@@ -92,10 +93,12 @@ export async function review(
   emit: Emit,
   annotation?: Annotation,
 ): Promise<Annotation | null> {
+  const options = await aiOptions(uid, !riddler);
+  let currentAnnotationId = annotation?.id;
   const emitTagged: Emit = async (event, data) => {
     await emit(event, {
       ...data,
-      ...(annotation ? { annotationId: annotation.id } : {}),
+      ...(currentAnnotationId ? { annotationId: currentAnnotationId } : {}),
       ...(riddler ? { riddlerId: riddler.id } : {}),
     });
   };
@@ -119,13 +122,15 @@ export async function review(
           if (/"speak"\s*:\s*true/.test(incoming)) {
             const prefix = partialBody(incoming);
             if (prefix.startsWith(streamedBody) && prefix.length > streamedBody.length) {
-              if (!streamedBody) await emit('status', { state: 'writing', riddlerId: riddler?.id ?? null });
+              if (!streamedBody)
+                await emitTagged('status', { state: 'writing', riddlerId: riddler?.id ?? null });
               await emitTagged('text', { delta: prefix.slice(streamedBody.length) });
               streamedBody = prefix;
             }
           }
         }
       },
+      options,
       decisionFormat,
     );
     raw = result.text;
@@ -144,7 +149,7 @@ export async function review(
       if (kind === 'drawing' && !drawing) throw new Error('Drawing missing');
       if (drawing) {
         kind = 'drawing';
-        await emit('status', { state: 'drawing', riddlerId: riddler?.id ?? null });
+        await emitTagged('status', { state: 'drawing', riddlerId: riddler?.id ?? null });
       }
       const a: Annotation = {
         ...(annotation || store.newAnnotation(note, riddler?.id ?? null)),
@@ -154,8 +159,9 @@ export async function review(
         drawing,
         thinking: thinking || null,
       };
+      currentAnnotationId = a.id;
       if (body && body !== streamedBody) {
-        await emit('status', { state: 'writing', riddlerId: riddler?.id ?? null });
+        await emitTagged('status', { state: 'writing', riddlerId: riddler?.id ?? null });
         await emitTagged('text', {
           delta: body.startsWith(streamedBody) ? body.slice(streamedBody.length) : body,
         });
@@ -185,6 +191,7 @@ export async function ask(
   emit: Emit,
   signal?: AbortSignal,
 ) {
+  const options = await aiOptions(uid);
   const riddler = data.riddlerId ? store.getRiddler(uid, data.riddlerId) : undefined,
     a = store.newAnnotation(note, riddler?.id ?? null),
     draw = data.action === 'draw';
@@ -214,6 +221,7 @@ export async function ask(
       async (event, value) => {
         if (event === 'thinking' || !draw) await emit(event, { ...value, annotationId: a.id });
       },
+      options,
       undefined,
       signal,
     );
@@ -244,6 +252,7 @@ export async function ask(
   await emit('status', { state: 'idle' });
 }
 export async function reply(uid: string, a: Annotation, text: string, emit: Emit, signal?: AbortSignal) {
+  const options = await aiOptions(uid);
   const note = store.getNote(uid, a.noteId),
     riddler = a.riddlerId ? store.riddlers(uid).find((r) => r.id === a.riddlerId) : undefined;
   a.replies.push({ id: randomUUID(), role: 'user', body: text, thinking: null, createdAt: Date.now() });
@@ -257,6 +266,7 @@ export async function reply(uid: string, a: Annotation, text: string, emit: Emit
     async (event, value) => {
       await emit(event, { ...value, annotationId: a.id });
     },
+    options,
     undefined,
     signal,
   );

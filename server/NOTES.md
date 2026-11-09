@@ -47,3 +47,11 @@ npm run build
 npm start
 npm run smoke
 ```
+
+## v2
+
+- Per-user preferences live in a new `user_settings` table, created at boot without changing existing tables. Defaults come from `DEFAULT_MODEL`, `REASONING_EFFORT`, and `REASONING_SUMMARY`. PATCH validates the partial settings shape and stores normalized efforts; null background preferences preserve inheritance. Effective inherited background effort is clamped again against the background model.
+- ChatGPT model discovery uses client version `0.166.0`, the same authorization headers as Responses, and the existing credential refresh mutex with one retry after 401. Visible models are cached per user for ten minutes. API-key accounts and discovery failures receive the configured default model with low/medium/high efforts. Failures are retried on the next lookup. Unknown model ids use the fallback effort capabilities without substituting the requested model id.
+- Each ask, reply, and review resolves preferences once and passes explicit model, effort, and summary options through all Responses retries. Riddlers use foreground preferences; read-along reviews use background preferences. Summary `off` omits the summary property from reasoning entirely.
+- Background runs carry a UUID on every event, including errors and final annotations. Riddler identity and known annotation identity accompany subsequent events. Every run ends with one idle status; silent read-along runs include `silent: true`. A new event subscription receives a ping instead of an unscoped idle status.
+- Smoke coverage retains the existing checks and adds settings defaults, validation, persistence and isolation, effort normalization/inheritance, actual Responses request options (including omitted summary), model discovery mapping/cache/expiry/401/failure fallback, and speaking, silent, and failed background run identity. Provider calls remain stubbed. Final verification: `npm run build` passes and `npm run smoke` passes 83 checks. The required Prettier 3.3.3 command completed successfully using the cached package.

@@ -4,6 +4,9 @@ import os from 'node:os';
 import path from 'node:path';
 const tmp = await mkdtemp(path.join(os.tmpdir(), 'doddled-smoke-'));
 process.env.NODE_ENV = 'test';
+process.env.DEFAULT_MODEL = 'smoke-default';
+process.env.REASONING_EFFORT = 'medium';
+process.env.REASONING_SUMMARY = 'concise';
 process.env.DATA_DIR = path.join(tmp, 'data');
 process.env.WEB_DIST = path.join(tmp, 'web');
 process.env.APP_SECRET = 'smoke-only-secret-0123456789abcdefghijklmnop';
@@ -16,6 +19,44 @@ const base = 'http://localhost';
 let checks = 0;
 const originalFetch = globalThis.fetch;
 const modelOutputs: Array<string | number> = [];
+let expectedModel = 'smoke-default';
+let expectedReasoning: Record<string, string> = { effort: 'medium', summary: 'concise' };
+let discoveryCalls = 0;
+const discoveryOutputs: Array<number | object> = [];
+const liveModels = {
+  models: [
+    {
+      slug: 'smoke-default',
+      display_name: 'Default model',
+      description: 'For writing',
+      visibility: 'list',
+      default_reasoning_level: 'medium',
+      supported_reasoning_levels: [
+        { effort: 'medium', description: 'Balanced' },
+        { effort: 'high', description: 'Thorough' },
+      ],
+    },
+    {
+      slug: 'smoke-background',
+      display_name: 'Reader',
+      description: 'For reading',
+      visibility: 'list',
+      default_reasoning_level: 'low',
+      supported_reasoning_levels: [
+        { effort: 'low', description: 'Quick' },
+        { effort: 'ultra', description: 'Deep' },
+      ],
+    },
+    {
+      slug: 'hidden-model',
+      display_name: 'Hidden',
+      description: '',
+      visibility: 'hide',
+      default_reasoning_level: 'low',
+      supported_reasoning_levels: [{ effort: 'low', description: '' }],
+    },
+  ],
+};
 let modelCalls = 0,
   refreshCalls = 0;
 const fakeJWT = (claims: Record<string, unknown>) =>
@@ -39,6 +80,14 @@ globalThis.fetch = async (url, init) => {
       expires_in: 3600,
     });
   }
+  if (String(url) === 'https://chatgpt.com/backend-api/codex/models?client_version=0.166.0') {
+    discoveryCalls++;
+    const headers = new Headers(init?.headers);
+    assert.match(headers.get('Authorization')!, /^Bearer /);
+    assert.equal(headers.get('ChatGPT-Account-Id'), fakeAccount);
+    const next = discoveryOutputs.shift() ?? liveModels;
+    return typeof next === 'number' ? new Response('{}', { status: next }) : Response.json(next);
+  }
   assert.match(
     String(url),
     /^https:\/\/(?:api\.openai\.com\/v1|chatgpt\.com\/backend-api\/codex)\/responses$/,
@@ -48,7 +97,8 @@ globalThis.fetch = async (url, init) => {
   assert.equal(data.store, false);
   assert.ok(data.instructions);
   assert.deepEqual(data.include, ['reasoning.encrypted_content']);
-  assert.equal(data.reasoning.summary, 'concise');
+  assert.equal(data.model, expectedModel);
+  assert.deepEqual(data.reasoning, expectedReasoning);
   modelCalls++;
   const next = modelOutputs.shift();
   assert.notEqual(next, undefined, 'Unexpected model request');
@@ -121,6 +171,43 @@ try {
   assert.match(login.headers.get('set-cookie')!, /SameSite=Lax/i);
   const me = await (await request(base, '/api/auth/me', 'GET', undefined, cookie)).json();
   assert.ok(me.user.id);
+  await request(base, '/api/settings', 'GET', undefined, undefined, 401);
+  await request(base, '/api/models', 'GET', undefined, undefined, 401);
+  const defaults = {
+    model: 'smoke-default',
+    effort: 'medium',
+    summary: 'concise',
+    backgroundModel: null,
+    backgroundEffort: null,
+  };
+  assert.deepEqual(
+    (await (await request(base, '/api/settings', 'GET', undefined, cookie)).json()).settings,
+    defaults,
+  );
+  assert.deepEqual(await (await request(base, '/api/models', 'GET', undefined, cookie)).json(), {
+    models: [
+      {
+        id: 'smoke-default',
+        name: 'smoke-default',
+        description: '',
+        defaultEffort: 'medium',
+        efforts: ['low', 'medium', 'high'],
+      },
+    ],
+    source: 'fallback',
+  });
+  assert.equal(discoveryCalls, 0);
+  const changed = (
+    await (
+      await request(base, '/api/settings', 'PATCH', { effort: 'ultra', backgroundEffort: 'max' }, cookie)
+    ).json()
+  ).settings;
+  assert.deepEqual(changed, { ...defaults, backgroundEffort: 'medium' });
+  await request(base, '/api/settings', 'PATCH', { summary: 'invalid' }, cookie, 400);
+  await request(base, '/api/settings', 'PATCH', { model: '' }, cookie, 400);
+  await request(base, '/api/settings', 'PATCH', { surprise: true }, cookie, 400);
+  await request(base, '/api/settings', 'PATCH', { backgroundEffort: null }, cookie);
+
   const { note } = await (
     await request(
       base,
@@ -173,6 +260,15 @@ try {
   await request(base, `/api/notes/${note.id}`, 'PATCH', { riddlerIds: [riddler.id] }, cookie);
   const other = await request(base, '/api/auth/test-session', 'POST', { identity: 'other' });
   const otherCookie = other.headers.get('set-cookie')!.split(';')[0];
+  await request(base, '/api/settings', 'PATCH', { effort: 'high', summary: 'detailed' }, cookie);
+  assert.deepEqual(
+    (await (await request(base, '/api/settings', 'GET', undefined, otherCookie)).json()).settings,
+    defaults,
+  );
+  const persistedSettings = db.prepare('SELECT data FROM user_settings WHERE user_id=?').get(me.user.id) as {
+    data: string;
+  };
+  assert.equal(JSON.parse(persistedSettings.data).summary, 'detailed');
   assert.deepEqual(
     (await (await request(base, '/api/notes', 'GET', undefined, otherCookie)).json()).notes,
     [],
@@ -198,7 +294,7 @@ try {
   const stream = await app.request(base + `/api/notes/${note.id}/events`, { headers: { Cookie: cookie } });
   assert.match(stream.headers.get('content-type')!, /text\/event-stream/);
   const reader = stream.body!.getReader();
-  assert.match(new TextDecoder().decode((await reader.read()).value), /event: status/);
+  assert.match(new TextDecoder().decode((await reader.read()).value), /event: ping/);
   await reader.cancel();
   checks++;
 
@@ -209,6 +305,7 @@ try {
   assert.equal(new URL(authURL).searchParams.get('redirect_uri'), 'http://localhost:1455/auth/callback');
   assert.equal(new URL(authURL).searchParams.get('originator'), 'pi');
   await request(base, '/api/auth/apikey', 'POST');
+  expectedReasoning = { effort: 'high', summary: 'detailed' };
   modelOutputs.push('What assumption would change your conclusion?');
   const answer = events(
     await (
@@ -226,6 +323,8 @@ try {
   assert.equal(annotation.kind, 'question');
   assert.equal(answer.at(-1)!.event, 'done');
   assert.ok(answer.some((e) => e.event === 'thinking'));
+  await request(base, '/api/settings', 'PATCH', { summary: 'off' }, cookie);
+  expectedReasoning = { effort: 'high' };
   modelOutputs.push('Check it with a small counterexample.');
   const thread = events(
     await (
@@ -244,6 +343,8 @@ try {
   );
   await request(base, `/api/annotations/${annotation.id}`, 'PATCH', { status: 'resolved' }, otherCookie, 404);
   await request(base, `/api/annotations/${annotation.id}`, 'PATCH', { status: 'resolved' }, cookie);
+  await request(base, '/api/settings', 'PATCH', { effort: 'medium', summary: 'concise' }, cookie);
+  expectedReasoning = { effort: 'medium', summary: 'concise' };
   const drawing = {
     viewBox: '0 0 400 240',
     steps: [
@@ -285,24 +386,37 @@ try {
     false,
   );
   const { subscribe } = await import('../src/jobs/index.js');
-  async function background(pathname: string, payload: unknown) {
+  async function background(
+    pathname: string,
+    payload: unknown,
+    owner = { uid: me.user.id, noteId: note.id, cookie },
+  ) {
     const received: Array<{ event: string; data: any }> = [];
     let finish!: () => void;
     const done = new Promise<void>((resolve) => {
       finish = resolve;
     });
-    const unsub = subscribe(me.user.id, note.id, (event, data) => {
+    const unsub = subscribe(owner.uid, owner.noteId, (event, data) => {
       received.push({ event, data });
       if (event === 'status' && data.state === 'idle') finish();
     });
     const timer = setTimeout(finish, 3000);
     try {
-      const res = await request(base, pathname, 'POST', payload, cookie);
+      const res = await request(base, pathname, 'POST', payload, owner.cookie);
       await done;
       assert.ok(
         received.some((e) => e.event === 'status' && e.data.state === 'idle'),
         'Job did not finish',
       );
+      assert.equal(received.filter((e) => e.event === 'status' && e.data.state === 'idle').length, 1);
+      const runId = received[0].data.runId;
+      assert.equal(typeof runId, 'string');
+      assert.ok(runId.length > 0);
+      for (const event of received) {
+        assert.equal(event.data.runId, runId, `${event.event} missing stable runId`);
+      }
+      assert.equal(received.at(-1)!.data.state, 'idle');
+      checks++;
       return { received, result: await res.json() };
     } finally {
       clearTimeout(timer);
@@ -327,6 +441,11 @@ try {
     ),
   );
   assert.ok(riddled.received.some((e) => e.event === 'annotation'));
+  const finalRiddle = riddled.received.find((e) => e.event === 'annotation')!.data;
+  for (const event of riddled.received) {
+    assert.equal(event.data.riddlerId, builtins[0].id);
+    assert.equal(event.data.annotationId, finalRiddle.annotation.id);
+  }
   await request(
     base,
     `/api/notes/${note.id}`,
@@ -334,9 +453,22 @@ try {
     { mode: 'thinks', purpose: 'Probe assumptions' },
     cookie,
   );
+  await request(
+    base,
+    '/api/settings',
+    'PATCH',
+    { backgroundModel: 'reader-model', backgroundEffort: 'high' },
+    cookie,
+  );
+  expectedModel = 'reader-model';
+  expectedReasoning = { effort: 'high', summary: 'concise' };
   modelOutputs.push(JSON.stringify({ speak: false, kind: 'comment', anchor: null, body: '', drawing: null }));
   const nudged = await background(`/api/notes/${note.id}/nudge`, {});
   assert.equal(nudged.result.queued, true);
+  assert.equal(nudged.received.at(-1)!.data.silent, true);
+  assert.notEqual(nudged.received[0].data.runId, riddled.received[0].data.runId);
+  expectedModel = 'smoke-default';
+  expectedReasoning = { effort: 'medium', summary: 'concise' };
   const before = modelCalls;
   assert.equal(
     (await (await request(base, `/api/notes/${note.id}/nudge`, 'POST', {}, cookie)).json()).queued,
@@ -347,6 +479,29 @@ try {
     (await (await request(base, `/api/notes/${note.id}`, 'GET', undefined, cookie)).json()).note.content,
     'Edited by the writer',
   );
+  await request(base, `/api/notes/${note.id}`, 'PATCH', { content: 'A new passage for the reader' }, cookie);
+  await request(base, '/api/settings', 'PATCH', { backgroundEffort: null }, cookie);
+  expectedModel = 'reader-model';
+  modelOutputs.push(
+    JSON.stringify({
+      speak: true,
+      kind: 'comment',
+      anchor: null,
+      body: 'A useful margin note.',
+      drawing: null,
+    }),
+  );
+  const spoken = await background(`/api/notes/${note.id}/nudge`, {});
+  const finalNudge = spoken.received.find((e) => e.event === 'annotation')!.data;
+  assert.equal(finalNudge.annotationId, finalNudge.annotation.id);
+  assert.equal(spoken.received.at(-1)!.data.annotationId, finalNudge.annotation.id);
+  assert.equal(spoken.received.at(-1)!.data.silent, undefined);
+  expectedModel = 'smoke-default';
+  modelOutputs.push(500);
+  const failedRun = await background(`/api/notes/${note.id}/riddle`, { riddlerIds: [builtins[0].id] });
+  assert.equal(failedRun.received.at(-2)!.event, 'error');
+  assert.ok(failedRun.received.at(-2)!.data.error);
+  assert.equal(failedRun.received.at(-1)!.data.silent, undefined);
   await request(base, `/api/annotations/${annotation.id}`, 'DELETE', undefined, cookie);
 
   const credsFile = path.join(tmp, 'codex-auth.json');
@@ -392,6 +547,117 @@ try {
   );
   assert.ok(after401.some((e) => e.event === 'annotation'));
   assert.equal(refreshCalls, 2, '401 should refresh once');
+  const mappedModels = [
+    {
+      id: 'smoke-default',
+      name: 'Default model',
+      description: 'For writing',
+      defaultEffort: 'medium',
+      efforts: ['medium', 'high'],
+    },
+    {
+      id: 'smoke-background',
+      name: 'Reader',
+      description: 'For reading',
+      defaultEffort: 'low',
+      efforts: ['low', 'ultra'],
+    },
+  ];
+  const discoveryBeforeCache = discoveryCalls;
+  assert.deepEqual(await (await request(base, '/api/models', 'GET', undefined, importedCookie)).json(), {
+    models: mappedModels,
+    source: 'live',
+  });
+  assert.equal(discoveryCalls, discoveryBeforeCache, 'Models cached per user');
+  const realNow = Date.now;
+  try {
+    Date.now = () => realNow() + 11 * 60 * 1000;
+    discoveryOutputs.push(401, liveModels);
+    await request(base, '/api/models', 'GET', undefined, importedCookie);
+    assert.equal(discoveryCalls, discoveryBeforeCache + 2);
+    assert.equal(refreshCalls, 3, 'Model discovery refreshes once after 401');
+    Date.now = () => realNow() + 22 * 60 * 1000;
+    discoveryOutputs.push(503);
+    const unavailable = await (await request(base, '/api/models', 'GET', undefined, importedCookie)).json();
+    assert.equal(unavailable.source, 'fallback');
+    assert.deepEqual(unavailable.models[0].efforts, ['low', 'medium', 'high']);
+    discoveryOutputs.push(liveModels);
+    assert.equal(
+      (await (await request(base, '/api/models', 'GET', undefined, importedCookie)).json()).source,
+      'live',
+    );
+  } finally {
+    Date.now = realNow;
+  }
+  const liveSettings = (
+    await (
+      await request(
+        base,
+        '/api/settings',
+        'PATCH',
+        {
+          model: 'smoke-background',
+          effort: 'high',
+          backgroundModel: 'smoke-default',
+          backgroundEffort: 'ultra',
+          summary: 'auto',
+        },
+        importedCookie,
+      )
+    ).json()
+  ).settings;
+  assert.deepEqual(liveSettings, {
+    model: 'smoke-background',
+    effort: 'low',
+    summary: 'auto',
+    backgroundModel: 'smoke-default',
+    backgroundEffort: 'medium',
+  });
+  await request(
+    base,
+    '/api/settings',
+    'PATCH',
+    { effort: 'ultra', backgroundModel: null, backgroundEffort: null },
+    importedCookie,
+  );
+  expectedModel = 'smoke-background';
+  expectedReasoning = { effort: 'ultra', summary: 'auto' };
+  modelOutputs.push('Using your selected model.');
+  await request(
+    base,
+    `/api/notes/${oauthNote.id}/ask`,
+    'POST',
+    { prompt: 'Use my preferences' },
+    importedCookie,
+  );
+  // A null background effort inherits, then clamps against the background model.
+  await request(base, '/api/settings', 'PATCH', { backgroundModel: 'smoke-default' }, importedCookie);
+  const { aiOptions } = await import('../src/settings.js');
+  assert.deepEqual(await aiOptions(importedUser.id, true), {
+    model: 'smoke-default',
+    effort: 'medium',
+    summary: 'auto',
+  });
+  expectedModel = 'smoke-default';
+  expectedReasoning = { effort: 'medium', summary: 'auto' };
+  modelOutputs.push(JSON.stringify({ speak: false, kind: 'comment', anchor: null, body: '', drawing: null }));
+  const inheritedNudge = await background(
+    `/api/notes/${oauthNote.id}/nudge`,
+    {},
+    {
+      uid: importedUser.id,
+      noteId: oauthNote.id,
+      cookie: importedCookie,
+    },
+  );
+  assert.equal(inheritedNudge.received.at(-1)!.data.silent, true);
+  const reclamped = (
+    await (await request(base, '/api/settings', 'PATCH', { model: 'smoke-default' }, importedCookie)).json()
+  ).settings;
+  assert.equal(reclamped.effort, 'medium', 'Changing the model reclamps the stored effort');
+
+  checks++;
+
   const { readFile } = await import('node:fs/promises');
   assert.equal(await readFile(credsFile, 'utf8'), originalCredentials, 'Codex import must remain read-only');
   assert.equal(modelOutputs.length, 0);

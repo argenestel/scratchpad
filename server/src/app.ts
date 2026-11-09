@@ -8,6 +8,7 @@ import type { Env } from './types.js';
 import { registerAuth, requireUser } from './auth.js';
 import { registerRoutes } from './routes.js';
 import { registerAI } from './ai/routes.js';
+import { registerSettings } from './settings.js';
 export const app = new Hono<Env>();
 app.use('/api/*', async (c, next) => {
   c.header('Cache-Control', 'no-store');
@@ -30,6 +31,7 @@ app.get('/api/health', (c) => c.json({ ok: true }));
 registerAuth(app);
 app.use('/api/*', requireUser);
 registerRoutes(app);
+registerSettings(app);
 registerAI(app);
 app.all('/api/*', (c) => c.json({ error: 'Not found' }, 404));
 app.use('*', serveStatic({ root: config.webDist }));

@@ -8,7 +8,9 @@ const dataDir = path.resolve(process.env.DATA_DIR || './data');
 mkdirSync(dataDir, { recursive: true, mode: 0o700 });
 let secret = process.env.APP_SECRET?.trim();
 if (secret && (secret.startsWith('replace-with') || secret.length < 32))
-  throw new Error('APP_SECRET is a placeholder or too short (min 32 chars). Leave it empty to auto-generate one in DATA_DIR.');
+  throw new Error(
+    'APP_SECRET is a placeholder or too short (min 32 chars). Leave it empty to auto-generate one in DATA_DIR.',
+  );
 if (!secret) {
   const file = path.join(dataDir, 'secret');
   try {
@@ -42,7 +44,7 @@ export const config = {
   apiKey: process.env.OPENAI_API_KEY,
   model: process.env.DEFAULT_MODEL || 'gpt-6.1-sol',
   effort: process.env.REASONING_EFFORT || 'medium',
-  summary: process.env.REASONING_SUMMARY || 'concise',
+  summary: z.enum(['concise', 'detailed', 'auto', 'off']).parse(process.env.REASONING_SUMMARY || 'concise'),
   concurrency: positive.parse(process.env.JOB_CONCURRENCY || 3),
   nodeEnv: process.env.NODE_ENV || 'development',
 };

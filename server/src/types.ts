@@ -106,3 +106,20 @@ export type Annotation = {
   createdAt: number;
 };
 export type Emit = (event: string, data: Record<string, unknown>) => void | Promise<void>;
+
+export type Effort = string;
+export type ModelInfo = {
+  id: string;
+  name: string;
+  description: string;
+  defaultEffort: Effort;
+  efforts: Effort[];
+};
+export type Settings = {
+  model: string;
+  effort: Effort;
+  summary: 'concise' | 'detailed' | 'auto' | 'off';
+  backgroundModel: string | null;
+  backgroundEffort: Effort | null;
+};
+export type AIOptions = Pick<Settings, 'model' | 'effort' | 'summary'>;

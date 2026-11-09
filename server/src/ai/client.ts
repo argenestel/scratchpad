@@ -1,11 +1,12 @@
-import { config } from '../config.js';
+import { authHeaders } from './auth-headers.js';
 import { getCredentials } from '../auth.js';
-import type { Emit } from '../types.js';
+import type { Emit, AIOptions } from '../types.js';
 export async function response(
   uid: string,
   instructions: string,
   input: string,
   emit: Emit,
+  options: AIOptions,
   format?: Record<string, unknown>,
   signal?: AbortSignal,
 ) {
@@ -15,17 +16,7 @@ export async function response(
   const controller = AbortSignal.any([AbortSignal.timeout(180000), ...(signal ? [signal] : [])]);
   let res: Response;
   for (;;) {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      Accept: 'text/event-stream',
-      Authorization: 'Bearer ' + credentials.access,
-    };
-    if (credentials.authMethod === 'chatgpt') {
-      headers['ChatGPT-Account-Id'] = credentials.accountId!;
-      headers['OpenAI-Beta'] = 'responses=experimental';
-      headers.originator = 'pi';
-      headers['User-Agent'] = 'pi';
-    }
+    const headers = authHeaders(credentials);
     res = await fetch(
       credentials.authMethod === 'chatgpt'
         ? 'https://chatgpt.com/backend-api/codex/responses'
@@ -34,12 +25,15 @@ export async function response(
         method: 'POST',
         headers,
         body: JSON.stringify({
-          model: config.model,
+          model: options.model,
           stream: true,
           store: false,
           instructions,
           input: [{ role: 'user', content: [{ type: 'input_text', text: input }] }],
-          reasoning: { effort: config.effort, summary: config.summary },
+          reasoning: {
+            effort: options.effort,
+            ...(options.summary === 'off' ? {} : { summary: options.summary }),
+          },
           include: ['reasoning.encrypted_content'],
           ...(useFormat ? { text: { format } } : {}),
         }),

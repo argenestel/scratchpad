@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { config } from '../config.js';
 import { db } from '../db.js';
 import * as store from '../store.js';
@@ -74,13 +74,15 @@ function pump() {
 }
 async function run(j: Job) {
   const { uid, noteId } = j;
+  const runId = randomUUID();
   let annotationId: string | undefined;
+  let silent = j.nudge;
   const emit: Emit = (event, data) =>
     publish(uid, noteId, event, {
-      ...(['status', 'thinking', 'text'].includes(event)
-        ? { ...(j.riddlerId ? { riddlerId: j.riddlerId } : {}), ...(annotationId ? { annotationId } : {}) }
-        : {}),
       ...data,
+      runId,
+      ...(j.riddlerId ? { riddlerId: j.riddlerId } : {}),
+      ...(annotationId ? { annotationId } : {}),
     });
   try {
     const note = store.getNote(uid, noteId),
@@ -110,6 +112,8 @@ async function run(j: Job) {
     if (j.nudge && (current.content !== note.content || current.mode !== 'thinks')) return;
     if (result) {
       if (placeholder) store.getAnnotation(uid, placeholder.id);
+      annotationId = result.id;
+      silent = false;
       store.putAnnotation(uid, result);
       await emit('annotation', { annotation: result });
     } else if (placeholder) {
@@ -120,10 +124,15 @@ async function run(j: Job) {
         'INSERT INTO reviews(note_id,user_id,content_hash,last_spoke) VALUES(?,?,?,?) ON CONFLICT(note_id) DO UPDATE SET content_hash=excluded.content_hash,last_spoke=CASE WHEN excluded.last_spoke>0 THEN excluded.last_spoke ELSE reviews.last_spoke END WHERE reviews.user_id=excluded.user_id',
       ).run(noteId, uid, hash, result ? Date.now() : 0);
   } catch {
+    silent = false;
     if (annotationId) store.deleteAnnotation(uid, annotationId);
     await emit('error', { error: 'Review failed. Check your sign-in and try again.' });
   } finally {
-    await emit('status', { state: 'idle', riddlerId: j.riddlerId ?? null });
+    await emit('status', {
+      state: 'idle',
+      riddlerId: j.riddlerId ?? null,
+      ...(silent ? { silent: true } : {}),
+    });
   }
 }
 export function stopJobs() {
