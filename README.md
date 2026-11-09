@@ -1,4 +1,4 @@
-# doddled
+# scratchpad
 
 An AI notebook that thinks with you: margin questions, explanations, step-by-step
 ink drawings, and Riddler reviewer personas. In **thinks** mode it reads along and
@@ -13,7 +13,7 @@ cp .env.example .env && docker compose up -d --build
 ```
 
 Open http://localhost:3000. `APP_SECRET` is generated on first boot and kept in the
-data volume unless you set one (min 32 chars). Data persists in the `doddled-data`
+data volume unless you set one (min 32 chars). Data persists in the `scratchpad-data`
 volume at `/data`. See `.env.example` for configuration.
 
 ## Sign in
@@ -57,7 +57,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 Open http://localhost:5173. The `server` and `web` services bind-mount their source
 and keep dependencies in separate named volumes. The server dev image includes
 the compiler tools needed by better-sqlite3. Dependencies install on startup,
-then both services run with hot reload. The production `doddled` service is placed
+then both services run with hot reload. The production `scratchpad` service is placed
 behind the `production` profile in this override to avoid port conflicts. Stop
 dev with `docker compose -f docker-compose.yml -f docker-compose.dev.yml down`.
 

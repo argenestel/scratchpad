@@ -408,7 +408,7 @@ export function startCallbackListener() {
     } catch {
       res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(
-        '<!doctype html><title>Sign-in failed</title><h1>Sign-in failed</h1><p>Login expired, was denied, or could not be completed. Return to doddled and try again.</p>',
+        '<!doctype html><title>Sign-in failed</title><h1>Sign-in failed</h1><p>Login expired, was denied, or could not be completed. Return to scratchpad and try again.</p>',
       );
     }
   });

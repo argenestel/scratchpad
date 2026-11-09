@@ -12,7 +12,7 @@ const ACTIONS: { id: AskAction; label: string; icon: keyof typeof ICONS; hint: s
 ];
 const ICONS = { chat: I.chat, bulb: I.bulb, draw: I.draw, question: I.question };
 
-/** ⌘K palette: type a question, watch doddled think, read the answer — all in one place. */
+/** ⌘K palette: type a question, watch scratchpad think, read the answer — all in one place. */
 export function AskPalette({ quote, riddlers, inkColor, ai, run, result, onSubmit, onClose, onOpenSettings, onUpdate, onRemove }: {
   quote: string | null; riddlers: Riddler[]; inkColor: string;
   ai: { settings: Settings; model?: ModelInfo } | null;
@@ -43,7 +43,7 @@ export function AskPalette({ quote, riddlers, inkColor, ai, run, result, onSubmi
 
   return (
     <div className="scrim palette-scrim" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="palette" role="dialog" aria-modal aria-label="Ask doddled">
+      <div className="palette" role="dialog" aria-modal aria-label="Ask scratchpad">
         {!busy ? (
           <>
             {q && (
@@ -55,7 +55,7 @@ export function AskPalette({ quote, riddlers, inkColor, ai, run, result, onSubmi
             <div className="palette-input">
               <I.sparkle size={18} />
               <textarea ref={inputRef} rows={1} value={prompt}
-                placeholder={q ? 'What do you want to know about this?' : riddler ? `Ask ${riddler.name}…` : 'Ask doddled about this note…'}
+                placeholder={q ? 'What do you want to know about this?' : riddler ? `Ask ${riddler.name}…` : 'Ask scratchpad about this note…'}
                 onChange={(e) => { setPrompt(e.target.value); e.target.style.height = 'auto'; e.target.style.height = `${Math.min(180, e.target.scrollHeight)}px`; }}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } }} />
               <button className="send" disabled={!prompt.trim() && !q} onClick={submit} aria-label="Send"><I.send /></button>
@@ -74,7 +74,7 @@ export function AskPalette({ quote, riddlers, inkColor, ai, run, result, onSubmi
               <label className="p-as">
                 <span className="dot" style={{ background: riddler?.color ?? inkColor }} />
                 <select value={as ?? ''} onChange={(e) => setAs(e.target.value || null)} aria-label="Who answers">
-                  <option value="">doddled</option>
+                  <option value="">scratchpad</option>
                   {riddlers.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
                 </select>
               </label>

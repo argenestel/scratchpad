@@ -69,10 +69,10 @@ export const NoteEditor = forwardRef<EditorHandle, Props>(function NoteEditor(pr
       { id: 'code', group: 'Blocks', title: 'Code block', hint: 'Syntax highlighted', icon: <I.code />, keywords: 'snippet', run: (e, r) => e.chain().focus().deleteRange(r).setCodeBlock().run() },
       { id: 'quote', group: 'Blocks', title: 'Quote', hint: 'Callout a passage', icon: <I.quote />, run: (e, r) => e.chain().focus().deleteRange(r).setBlockquote().run() },
       { id: 'hr', group: 'Blocks', title: 'Divider', hint: 'Separate sections', icon: <I.minus />, keywords: 'rule line', run: (e, r) => e.chain().focus().deleteRange(r).setHorizontalRule().run() },
-      { id: 'ask', group: 'doddled', title: 'Ask doddled', hint: 'Ask anything about this note', icon: <I.chat />, keywords: 'ai', run: (e, r) => { e.chain().focus().deleteRange(r).run(); cb.current.onAsk(null); } },
-      { id: 'explain', group: 'doddled', title: 'Explain this block', hint: 'Plain-language walkthrough', icon: <I.bulb />, keywords: 'ai', run: ai('explain') },
-      { id: 'diagram', group: 'doddled', title: 'Diagram this', hint: 'Sketch or flow diagram', icon: <I.draw />, keywords: 'ai draw mermaid', run: ai('draw') },
-      { id: 'quiz', group: 'doddled', title: 'Quiz me', hint: 'Test your understanding', icon: <I.question />, keywords: 'ai question', run: ai('question') },
+      { id: 'ask', group: 'scratchpad', title: 'Ask scratchpad', hint: 'Ask anything about this note', icon: <I.chat />, keywords: 'ai', run: (e, r) => { e.chain().focus().deleteRange(r).run(); cb.current.onAsk(null); } },
+      { id: 'explain', group: 'scratchpad', title: 'Explain this block', hint: 'Plain-language walkthrough', icon: <I.bulb />, keywords: 'ai', run: ai('explain') },
+      { id: 'diagram', group: 'scratchpad', title: 'Diagram this', hint: 'Sketch or flow diagram', icon: <I.draw />, keywords: 'ai draw mermaid', run: ai('draw') },
+      { id: 'quiz', group: 'scratchpad', title: 'Quiz me', hint: 'Test your understanding', icon: <I.question />, keywords: 'ai question', run: ai('question') },
     ];
   }, []);
 

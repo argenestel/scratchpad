@@ -1,6 +1,6 @@
-# doddled — shared contract (server ⇄ web)
+# scratchpad — shared contract (server ⇄ web)
 
-A notebook that thinks with you. You write; doddled reads along and leaves margin
+A notebook that thinks with you. You write; scratchpad reads along and leaves margin
 notes: questions, explanations, ink drawings. "Riddlers" are AI reviewer personas.
 All AI goes through the user's own ChatGPT account (Codex OAuth), reasoning enabled.
 

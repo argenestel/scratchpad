@@ -27,7 +27,7 @@ export function AnnotationView({ a, run, riddler, inkColor, compact, onUpdate, o
   onUpdate: (a: Annotation) => void; onRemove: (id: string) => void; onJump?: () => void;
 }) {
   const color = riddler?.color ?? inkColor;
-  const who = riddler?.name ?? 'doddled';
+  const who = riddler?.name ?? 'scratchpad';
   const [reply, setReply] = useState('');
   const [replyRun, setReplyRun] = useState<(Run & { user: string }) | null>(null);
   const [expanded, setExpanded] = useState(!compact);

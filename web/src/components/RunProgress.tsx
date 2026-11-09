@@ -42,7 +42,7 @@ export function RunProgress({ run, who, compact }: { run: Run; who?: string; com
   useEffect(() => { const el = boxRef.current; if (el) el.scrollTop = el.scrollHeight; }, [run.thinking, showThinking]);
 
   if (run.silent) {
-    return <div className="run silent"><I.check size={14} /> {who ?? 'doddled'} read along. Nothing worth adding yet.</div>;
+    return <div className="run silent"><I.check size={14} /> {who ?? 'scratchpad'} read along. Nothing worth adding yet.</div>;
   }
 
   return (

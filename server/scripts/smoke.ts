@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-const tmp = await mkdtemp(path.join(os.tmpdir(), 'doddled-smoke-'));
+const tmp = await mkdtemp(path.join(os.tmpdir(), 'scratchpad-smoke-'));
 process.env.NODE_ENV = 'test';
 process.env.DEFAULT_MODEL = 'smoke-default';
 process.env.REASONING_EFFORT = 'medium';
@@ -183,7 +183,7 @@ async function request(
 }
 try {
   await import('node:fs/promises').then((fs) => fs.mkdir(path.join(tmp, 'web'), { recursive: true }));
-  await writeFile(path.join(tmp, 'web', 'index.html'), '<html>doddled smoke SPA</html>');
+  await writeFile(path.join(tmp, 'web', 'index.html'), '<html>scratchpad smoke SPA</html>');
   assert.deepEqual(await (await request(base, '/api/health')).json(), { ok: true });
   await request(base, '/api/notes', 'GET', undefined, undefined, 401);
   const login = await request(base, '/api/auth/test-session', 'POST', {});
@@ -752,7 +752,7 @@ try {
   await request(base, `/api/notes/${note.id}`, 'DELETE', undefined, cookie);
   await request(base, `/api/notes/${note.id}`, 'GET', undefined, cookie, 404);
   const spa = await request(base, '/notes/example');
-  assert.match(await spa.text(), /doddled smoke SPA/);
+  assert.match(await spa.text(), /scratchpad smoke SPA/);
   await request(base, '/api/auth/logout', 'POST', {}, cookie);
   await request(base, '/api/notes', 'GET', undefined, cookie, 401);
   process.env.NODE_ENV = 'production';

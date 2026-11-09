@@ -1,7 +1,7 @@
 # Run with: docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 services:
   # Exclude the production service from normal dev startup to avoid port clashes.
-  doddled:
+  scratchpad:
     profiles: [production]
 
   server:
@@ -29,7 +29,7 @@ services:
     volumes:
       - ./server:/app/server
       - server-node-modules:/app/server/node_modules
-      - doddled-data:/data
+      - scratchpad-data:/data
       # - ${HOME}/.codex/auth.json:/codex/auth.json:ro
     # For Codex import, also set CODEX_AUTH_FILE=/codex/auth.json in .env.
 

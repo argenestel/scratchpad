@@ -36,7 +36,7 @@ export function App() {
     return () => window.removeEventListener('dd:unauthorized', h);
   }, []);
 
-  if (bootErr) return <div className="empty-state"><div><h2>Can't reach doddled</h2><p>{bootErr}</p><button className="btn" onClick={load}>Try again</button></div></div>;
+  if (bootErr) return <div className="empty-state"><div><h2>Can't reach scratchpad</h2><p>{bootErr}</p><button className="btn" onClick={load}>Try again</button></div></div>;
   if (!boot) return <div className="center-load">…</div>;
   if (!boot.user) return <><SignIn methods={boot.methods} onSignedIn={(user) => { history.replaceState(null, '', '/'); setBoot({ ...boot, user }); }} /><Toaster /></>;
   return <><Workspace user={boot.user} onSignedOut={() => setBoot({ ...boot, user: null })} /><Toaster /></>;
@@ -118,7 +118,7 @@ function Workspace({ user, onSignedOut }: { user: User; onSignedOut: () => void 
           <div className="empty-state">
             <div>
               <h2>{notes === null ? '…' : notes.length ? 'Pick a note' : 'Your first page'}</h2>
-              <p>Write freely. doddled reads along and leaves its thoughts in the margin.</p>
+              <p>Write freely. scratchpad reads along and leaves its thoughts in the margin.</p>
               <button className="btn primary lg" onClick={create}><I.pen /> Start writing</button>
             </div>
           </div>

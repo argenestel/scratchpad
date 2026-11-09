@@ -1,4 +1,4 @@
-// Typed client for the doddled server. Mirrors /CONTRACT.md.
+// Typed client for the scratchpad server. Mirrors /CONTRACT.md.
 
 export type Mode = 'thinks' | 'ask';
 export type User = { id: string; email: string | null; name: string | null; plan: string | null; authMethod: 'chatgpt' | 'apikey' };

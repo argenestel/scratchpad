@@ -15,7 +15,7 @@ export function PurposeModal({ value, onSave, onClose }: { value: string; onSave
   return (
     <Modal title="What is this note for?" onClose={onClose}>
       <div className="field">
-        <label htmlFor="purpose">Tell doddled what this note is for or how to behave in it</label>
+        <label htmlFor="purpose">Tell scratchpad what this note is for or how to behave in it</label>
         <textarea id="purpose" autoFocus value={v} onChange={(e) => setV(e.target.value)} placeholder="e.g. I'm drafting a pitch for investors. Poke holes in the market sizing." />
         <span className="hint">Applies only to this note. Riddlers keep their own voice but follow it too.</span>
       </div>

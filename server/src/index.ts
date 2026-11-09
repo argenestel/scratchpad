@@ -6,7 +6,7 @@ import { startCallbackListener } from './auth.js';
 import { stopJobs } from './jobs/index.js';
 const callback = startCallbackListener();
 const server = serve({ fetch: app.fetch, hostname: '0.0.0.0', port: config.port }, () => {
-  console.log(`doddled listening on port ${config.port}`);
+  console.log(`scratchpad listening on port ${config.port}`);
 });
 callback.on('error', () => {
   console.error('OAuth callback listener could not start');

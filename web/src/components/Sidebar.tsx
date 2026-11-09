@@ -16,7 +16,7 @@ export function Sidebar({ notes, activeId, user, onOpen, onNew, onRiddlers, onSe
   return (
     <aside className="sidebar">
       <div className="sidebar-top">
-        <span className="wordmark">doddled<i>.</i></span>
+        <span className="wordmark">scratchpad<i>.</i></span>
         <div style={{ display: 'flex' }}>
           <button className="icon-btn" onClick={onNew} aria-label="New note" title="New note (⌘⇧O)"><I.pen /></button>
           <button className="icon-btn" onClick={onCollapse} aria-label="Hide sidebar"><I.sidebar /></button>

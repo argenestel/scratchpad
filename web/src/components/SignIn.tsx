@@ -58,14 +58,14 @@ export function SignIn({ methods, onSignedIn }: { methods: AuthMethods; onSigned
   return (
     <div className="landing">
       <nav className="landing-nav">
-        <span className="wordmark">doddled<i>.</i></span>
+        <span className="wordmark">scratchpad<i>.</i></span>
         <a className="btn ghost sm" href="https://github.com/openai/codex" target="_blank" rel="noreferrer">How sign-in works</a>
       </nav>
 
       <main className="landing-main">
         <section className="hero">
           <h1>A notebook that <em>thinks</em> with you.</h1>
-          <p>Write the way you always do. doddled reads along, asks the question you skipped, explains the hard part, and sketches it in ink.</p>
+          <p>Write the way you always do. scratchpad reads along, asks the question you skipped, explains the hard part, and sketches it in ink.</p>
           <div className="hero-demo" aria-hidden>
             We should move the queue to Postgres. <mark>It's simpler than running Kafka and we'll never need more than 10k jobs/sec.</mark>
             <div className="ink-note ink">What happens to in-flight jobs when a worker dies holding a row lock? And is "never" a number from somewhere?</div>
@@ -74,7 +74,7 @@ export function SignIn({ methods, onSignedIn }: { methods: AuthMethods; onSigned
 
         <section className="signin-card">
           <h2>Start writing</h2>
-          <p className="sub">doddled runs on your own ChatGPT account, just like Codex. Nothing to pay here and no API key needed.</p>
+          <p className="sub">scratchpad runs on your own ChatGPT account, just like Codex. Nothing to pay here and no API key needed.</p>
 
           {device ? (
             <div className="device-box">
@@ -114,13 +114,13 @@ export function SignIn({ methods, onSignedIn }: { methods: AuthMethods; onSigned
 
           {err && <p className="err" style={{ marginTop: 14 }}>{err}</p>}
           <p className="fine">
-            Uses the same OAuth flow as the Codex CLI. Your tokens are encrypted and stay on this server. Requests go to your ChatGPT plan with reasoning on, so you can watch doddled think.
+            Uses the same OAuth flow as the Codex CLI. Your tokens are encrypted and stay on this server. Requests go to your ChatGPT plan with reasoning on, so you can watch scratchpad think.
           </p>
         </section>
       </main>
 
       <footer className="landing-foot">
-        <span>doddled<i style={{ color: 'var(--ink)', fontStyle: 'normal' }}>.</i> self-hosted</span>
+        <span>scratchpad<i style={{ color: 'var(--ink)', fontStyle: 'normal' }}>.</i> self-hosted</span>
         <span>It won't rewrite your notes.</span>
         <span>It won't give every answer.</span>
         <span>It won't interrupt every thought.</span>

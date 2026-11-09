@@ -1,7 +1,12 @@
+import fs from 'node:fs';
 import Database from 'better-sqlite3';
 import path from 'node:path';
 import { config } from './config.js';
-export const db = new Database(path.join(config.dataDir, 'doddled.db'));
+// Renamed from doddled.db: keep using an existing legacy database file if present.
+const legacy = path.join(config.dataDir, 'doddled.db');
+const current = path.join(config.dataDir, 'scratchpad.db');
+if (!fs.existsSync(current) && fs.existsSync(legacy)) fs.renameSync(legacy, current);
+export const db = new Database(current);
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 db.exec(`

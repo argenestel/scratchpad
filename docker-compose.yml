@@ -1,6 +1,6 @@
 # Optional env_file requires Docker Compose v2.24+.
 services:
-  doddled:
+  scratchpad:
     build: .
     ports:
       # Both ports intentionally bind to localhost for local single-user access.
@@ -11,7 +11,7 @@ services:
       - "127.0.0.1:3000:3000"
       - "127.0.0.1:1455:1455"
     volumes:
-      - doddled-data:/data
+      - scratchpad-data:/data
       # Optional: import credentials from an existing Codex sign-in.
       # - ${HOME}/.codex/auth.json:/codex/auth.json:ro
     env_file:
@@ -23,4 +23,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  doddled-data:
+  scratchpad-data:

@@ -4,7 +4,7 @@ import Suggestion, { type SuggestionKeyDownProps, type SuggestionProps } from '@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type ReactNode } from 'react';
 
 export type SlashItem = {
-  id: string; title: string; hint: string; group: 'Blocks' | 'doddled'; icon: ReactNode; keywords?: string;
+  id: string; title: string; hint: string; group: 'Blocks' | 'scratchpad'; icon: ReactNode; keywords?: string;
   run: (editor: Editor, range: Range) => void;
 };
 type MenuProps = SuggestionProps<SlashItem>;

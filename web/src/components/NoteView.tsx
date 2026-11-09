@@ -79,7 +79,7 @@ export function NoteView({ noteId, riddlers, onChanged, onDeleted, onOpenRiddler
   const handle = useCallback((e: StreamEvent, pendingKey?: string) => {
     if (e.type === 'done' || e.type === 'ping') return;
     const rid = e.riddlerId ?? (e.type === 'annotation' ? e.annotation.riddlerId : null) ?? null;
-    const key = pendingKey ?? e.runId ?? e.annotationId ?? `bg:${rid ?? 'doddled'}`;
+    const key = pendingKey ?? e.runId ?? e.annotationId ?? `bg:${rid ?? 'scratchpad'}`;
     const blank = (): Run => ({ key, phase: 'reading', thinking: '', text: '', startedAt: Date.now(), anchor: null, riddlerId: rid, kind: 'comment', background: !pendingKey });
     const drop = (keys: (string | undefined)[]) => setRuns((r) => {
       const c = { ...r }; let changed = false;
@@ -114,7 +114,7 @@ export function NoteView({ noteId, riddlers, onChanged, onDeleted, onOpenRiddler
       case 'annotation': {
         const a = e.annotation;
         setAnns((xs) => { const i = xs.findIndex((x) => x.id === a.id); if (i === -1) return [...xs, a]; const c = xs.slice(); c[i] = a; return c; });
-        drop([a.id, key, `bg:${a.riddlerId ?? 'doddled'}`]);
+        drop([a.id, key, `bg:${a.riddlerId ?? 'scratchpad'}`]);
         setPop((p) => (p?.runKey && p.runKey === key ? { ids: [a.id], getRect: p.getRect } : p));
         setPalette((p) => (p?.runKey && p.runKey === key ? { ...p, runKey: null, resultId: a.id } : p));
         if (!pendingKey) {
@@ -279,7 +279,7 @@ export function NoteView({ noteId, riddlers, onChanged, onDeleted, onOpenRiddler
 
   if (!note) return <div className="main"><div className="topbar">{sidebarToggle}</div><div className="center-load"><span className="spinner" /></div></div>;
 
-  const who = (rid: string | null) => (rid ? riddlerById[rid]?.name ?? 'Riddler' : 'doddled');
+  const who = (rid: string | null) => (rid ? riddlerById[rid]?.name ?? 'Riddler' : 'scratchpad');
   const colorOf = (rid: string | null) => riddlerById[rid ?? '']?.color ?? note.inkColor;
   const openAnns = anns.filter((a) => a.status === 'open');
   const resolvedAnns = anns.filter((a) => a.status === 'resolved');
@@ -333,7 +333,7 @@ export function NoteView({ noteId, riddlers, onChanged, onDeleted, onOpenRiddler
         )}
         <span className="spacer" />
         <span className="saved hide-sm">{saving === 'saving' ? 'Saving…' : saving === 'saved' ? 'Saved' : ''}</span>
-        <button className="btn sm" onClick={() => openPalette(editorRef.current?.selection()?.text ?? null)} title="Ask doddled (Ctrl/⌘ K)">
+        <button className="btn sm" onClick={() => openPalette(editorRef.current?.selection()?.text ?? null)} title="Ask scratchpad (Ctrl/⌘ K)">
           <I.sparkle /> <span className="hide-sm">Ask</span> <kbd className="hide-sm">⌘K</kbd>
         </button>
         <Popover align="right" trigger={(t) => <button className="btn sm ghost" onClick={t}><I.users /> <span className="hide-sm">Riddlers</span>{selRiddlers.size > 0 && <b>{selRiddlers.size}</b>}</button>}>
@@ -362,7 +362,7 @@ export function NoteView({ noteId, riddlers, onChanged, onDeleted, onOpenRiddler
         <Popover align="right" trigger={(t) => <button className="icon-btn" onClick={t} aria-label="More"><I.more /></button>}>
           {(close) => (
             <div>
-              <button className="menu-item" onClick={() => { close(); setPurposeOpen(true); }}><I.target /> Tell doddled what this is for</button>
+              <button className="menu-item" onClick={() => { close(); setPurposeOpen(true); }}><I.target /> Tell scratchpad what this is for</button>
               <button className="menu-item" onClick={() => { close(); onOpenSettings(); }}><I.sliders /> Models &amp; thinking</button>
               <div className="list-label" style={{ padding: '8px 10px 0' }}>Ink</div>
               <div className="swatches">
@@ -383,10 +383,10 @@ export function NoteView({ noteId, riddlers, onChanged, onDeleted, onOpenRiddler
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); editorRef.current?.focus(); } }} />
             <div className="props">
               <button className="prop" onClick={() => setPurposeOpen(true)}>
-                <I.target size={14} /><span className="k">Purpose</span><span className={`v ${note.purpose ? '' : 'empty'}`}>{note.purpose || 'Tell doddled what this note is for'}</span>
+                <I.target size={14} /><span className="k">Purpose</span><span className={`v ${note.purpose ? '' : 'empty'}`}>{note.purpose || 'Tell scratchpad what this note is for'}</span>
               </button>
               <button className="prop" onClick={onOpenSettings}>
-                <I.sparkle size={14} /><span className="k">doddled</span>
+                <I.sparkle size={14} /><span className="k">scratchpad</span>
                 <span className="v">{note.mode === 'thinks' ? 'Reads along and speaks up' : 'Answers when asked'}{ai ? ` · ${ai.model?.name ?? ai.settings.model}, ${ai.settings.effort}` : ''}</span>
               </button>
               {note.riddlerIds.length > 0 && (
@@ -398,7 +398,7 @@ export function NoteView({ noteId, riddlers, onChanged, onDeleted, onOpenRiddler
             </div>
 
             <NoteEditor key={note.id} ref={editorRef} markdown={note.content}
-              placeholder={note.mode === 'thinks' ? "Start writing. Type '/' for blocks, code and AI. doddled reads along." : "Start writing. Type '/' for blocks, code and AI."}
+              placeholder={note.mode === 'thinks' ? "Start writing. Type '/' for blocks, code and AI. scratchpad reads along." : "Start writing. Type '/' for blocks, code and AI."}
               anchors={anchors}
               onChange={(md) => update({ content: md }, { nudge: true })}
               onAnchorClick={(id) => {
@@ -451,7 +451,7 @@ export function NoteView({ noteId, riddlers, onChanged, onDeleted, onOpenRiddler
                 <div className="panel-empty">
                   {panelTab === 'open'
                     ? note.mode === 'thinks'
-                      ? <>doddled is reading along. Notes show up here and as highlights in your text.</>
+                      ? <>scratchpad is reading along. Notes show up here and as highlights in your text.</>
                       : <>Select text and choose <b>Explain</b>, <b>Diagram</b> or <b>Quiz</b>, or press <kbd>⌘K</kbd>.</>
                     : 'Nothing resolved yet.'}
                 </div>
