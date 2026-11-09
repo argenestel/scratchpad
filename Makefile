@@ -1,7 +1,10 @@
-.PHONY: up down logs build dev shell
+.PHONY: up down logs build dev shell tunnel
 
 up:
 	docker compose up -d --build
+
+tunnel:
+	docker compose --profile tunnel up -d --build
 
 down:
 	docker compose down

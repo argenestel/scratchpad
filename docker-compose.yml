@@ -22,5 +22,15 @@ services:
       # CODEX_AUTH_FILE: /codex/auth.json
     restart: unless-stopped
 
+  tunnel:
+    image: cloudflare/cloudflared:2025.11.1
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+    profiles: [tunnel]
+    depends_on:
+      - scratchpad
+    restart: unless-stopped
+
 volumes:
   scratchpad-data:
