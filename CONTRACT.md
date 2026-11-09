@@ -120,3 +120,12 @@ Every run ends with exactly one `status { state: 'idle', runId }`.
 - Every `status` event (foreground and background) additionally carries `model: string` and `effort: string` (resolved
   from settings) and, when `state` changes, `phase: 'reading' | 'thinking' | 'writing' | 'drawing' | 'done'`.
   Foreground streams emit `status { state:'thinking', phase:'reading' }` immediately on request receipt.
+
+## v4: response style and mind maps
+- `Settings` gains `askStyle: 'comment' | 'block'` (default `'comment'`) and `readAlongStyle: 'comment' | 'block'`
+  (default `'comment'`). `'block'` means the web client writes the AI answer into the note as a scratchpad block and
+  marks the annotation `resolved` (it stays in history under Done); the server still creates the annotation as usual.
+  Both are validated and persisted per user like the other settings (Node server and Worker/D1).
+- `POST /api/notes/:id/ask` accepts `action: 'mindmap'`: the AI returns `kind: 'explain'` with a body that is a single
+  fenced ```mermaid block using Mermaid `mindmap` syntax (root = the note's main topic; 2–4 levels; short labels; no
+  special characters that break mindmap syntax). Optional `selection` narrows it to that passage.
