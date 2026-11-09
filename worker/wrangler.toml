@@ -32,3 +32,13 @@ JOB_CONCURRENCY = "3"
 
 # Required: wrangler secret put APP_SECRET
 # Optional: wrangler secret put OPENAI_API_KEY
+
+# Shared modules under ../server/src must use this Worker's copies of hono/zod
+# (one module instance, and server/node_modules is not installed in CI).
+[alias]
+"hono" = "./node_modules/hono/dist/index.js"
+"hono/http-exception" = "./node_modules/hono/dist/http-exception.js"
+"hono/body-limit" = "./node_modules/hono/dist/middleware/body-limit/index.js"
+"hono/cookie" = "./node_modules/hono/dist/helper/cookie/index.js"
+"hono/streaming" = "./node_modules/hono/dist/helper/streaming/index.js"
+"zod" = "./node_modules/zod/index.js"

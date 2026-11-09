@@ -16,8 +16,17 @@
       "hono": [
         "./node_modules/hono"
       ],
-      "hono/*": [
-        "./node_modules/hono/*"
+      "hono/http-exception": [
+        "./node_modules/hono/dist/types/http-exception.d.ts"
+      ],
+      "hono/body-limit": [
+        "./node_modules/hono/dist/types/middleware/body-limit/index.d.ts"
+      ],
+      "hono/cookie": [
+        "./node_modules/hono/dist/types/helper/cookie/index.d.ts"
+      ],
+      "hono/streaming": [
+        "./node_modules/hono/dist/types/helper/streaming/index.d.ts"
       ],
       "zod": [
         "./node_modules/zod"

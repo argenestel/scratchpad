@@ -14,5 +14,7 @@ export default defineConfig(async () => ({
       },
     }),
   ],
+  // Shared ../server/src modules must resolve hono/zod from this package (single instance).
+  resolve: { dedupe: ['hono', 'zod'] },
   test: { include: ['test/**/*.test.ts'] },
 }));
