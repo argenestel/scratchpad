@@ -80,7 +80,7 @@ export function SignIn({ methods, onSignedIn }: { methods: AuthMethods; onSigned
     <div className="landing">
       <nav className="landing-nav">
         <Wordmark size={26} />
-        <a className="btn ghost sm" href="https://github.com/argenestel/doddled" target="_blank" rel="noreferrer">GitHub</a>
+        <a className="btn ghost sm" href="https://github.com/argenestel/scratchpad" target="_blank" rel="noreferrer">GitHub</a>
       </nav>
 
       <main className="landing-main">
