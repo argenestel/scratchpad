@@ -7,7 +7,8 @@ const legacy = path.join(config.dataDir, 'doddled.db');
 const current = path.join(config.dataDir, 'scratchpad.db');
 if (!fs.existsSync(current) && fs.existsSync(legacy)) {
   // Move the WAL/SHM side files too, or un-checkpointed writes would be lost.
-  for (const suffix of ['-wal', '-shm']) if (fs.existsSync(legacy + suffix)) fs.renameSync(legacy + suffix, current + suffix);
+  for (const suffix of ['-wal', '-shm'])
+    if (fs.existsSync(legacy + suffix)) fs.renameSync(legacy + suffix, current + suffix);
   fs.renameSync(legacy, current);
 }
 export const db = new Database(current);
@@ -24,4 +25,13 @@ CREATE TABLE IF NOT EXISTS riddlers(id TEXT PRIMARY KEY,user_id TEXT NOT NULL RE
 CREATE TABLE IF NOT EXISTS annotations(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,data TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS annotations_note ON annotations(user_id,note_id);
 CREATE TABLE IF NOT EXISTS reviews(note_id TEXT PRIMARY KEY REFERENCES notes(id) ON DELETE CASCADE,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,content_hash TEXT,last_spoke INTEGER NOT NULL DEFAULT 0);
+`);
+
+// Backfill v4 preferences in existing JSON rows without replacing other settings.
+db.exec(`
+UPDATE user_settings
+SET data = json_set(data,
+  '$.askStyle', COALESCE(json_extract(data, '$.askStyle'), 'comment'),
+  '$.readAlongStyle', COALESCE(json_extract(data, '$.readAlongStyle'), 'comment'))
+WHERE json_type(data, '$.askStyle') IS NULL OR json_type(data, '$.readAlongStyle') IS NULL;
 `);

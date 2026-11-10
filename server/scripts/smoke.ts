@@ -13,10 +13,31 @@ process.env.APP_SECRET = 'smoke-only-secret-0123456789abcdefghijklmnop';
 process.env.OPENAI_API_KEY = '';
 process.env.CODEX_AUTH_FILE = '';
 await import('node:fs/promises').then((fs) => fs.mkdir(path.join(tmp, 'web'), { recursive: true }));
+// Seed a pre-v4 database before boot to exercise the real migration.
+const { default: Database } = await import('better-sqlite3');
+await import('node:fs/promises').then((fs) => fs.mkdir(process.env.DATA_DIR!, { recursive: true }));
+const legacyDB = new Database(path.join(process.env.DATA_DIR!, 'scratchpad.db'));
+legacyDB.exec(`
+  CREATE TABLE users(id TEXT PRIMARY KEY,account_id TEXT UNIQUE,email TEXT,name TEXT,plan TEXT,auth_method TEXT NOT NULL,tokens TEXT);
+  CREATE TABLE user_settings(user_id TEXT PRIMARY KEY REFERENCES users(id),data TEXT NOT NULL);
+  INSERT INTO users(id,auth_method) VALUES('legacy','apikey');
+  INSERT INTO user_settings VALUES('legacy','{"model":"legacy-model","effort":"high","askStyle":"block"}');
+`);
+legacyDB.close();
 const { app } = await import('../src/app.js');
 const { db } = await import('../src/db.js');
 const base = 'http://localhost';
 let checks = 0;
+const legacySettings = JSON.parse(
+  (db.prepare("SELECT data FROM user_settings WHERE user_id='legacy'").get() as { data: string }).data,
+);
+assert.deepEqual(legacySettings, {
+  model: 'legacy-model',
+  effort: 'high',
+  askStyle: 'block',
+  readAlongStyle: 'comment',
+});
+checks++;
 const originalFetch = globalThis.fetch;
 const modelOutputs: Array<string | number> = [];
 let expectedModel = 'smoke-default';
@@ -198,6 +219,8 @@ try {
     model: 'smoke-default',
     effort: 'medium',
     summary: 'concise',
+    askStyle: 'comment',
+    readAlongStyle: 'comment',
     backgroundModel: null,
     backgroundEffort: null,
   };
@@ -228,6 +251,23 @@ try {
   await request(base, '/api/settings', 'PATCH', { model: '' }, cookie, 400);
   await request(base, '/api/settings', 'PATCH', { surprise: true }, cookie, 400);
   await request(base, '/api/settings', 'PATCH', { backgroundEffort: null }, cookie);
+
+  const styles = (
+    await (
+      await request(base, '/api/settings', 'PATCH', { askStyle: 'block', readAlongStyle: 'block' }, cookie)
+    ).json()
+  ).settings;
+  assert.equal(styles.askStyle, 'block');
+  assert.equal(styles.readAlongStyle, 'block');
+  const styleRoundTrip = (await (await request(base, '/api/settings', 'GET', undefined, cookie)).json())
+    .settings;
+  assert.equal(styleRoundTrip.askStyle, 'block');
+  assert.equal(styleRoundTrip.readAlongStyle, 'block');
+  for (const field of ['askStyle', 'readAlongStyle']) {
+    await request(base, '/api/settings', 'PATCH', { [field]: 'invalid' }, cookie, 400);
+    await request(base, '/api/settings', 'PATCH', { [field]: null }, cookie, 400);
+  }
+  await request(base, '/api/settings', 'PATCH', { askStyle: 'comment', readAlongStyle: 'comment' }, cookie);
 
   const { note } = await (
     await request(
@@ -417,6 +457,53 @@ try {
     mermaid,
   );
   checks++;
+  const mapSource = 'Edited by the writer';
+  const happyMap = '```mermaid\nmindmap\n  root((Writing))\n    Ideas\n      Draft\n```';
+  const sanitizedMap = '```mermaid\nmindmap\n  root((Writing Topic))\n    Ideas risky\n```';
+  for (const scenario of [
+    { outputs: [happyMap], body: happyMap },
+    {
+      outputs: [
+        'Extra prose\n```mermaid\n\nmindmap\n  root((Writing: "Topic"))\n    Ideas [risky] ()\n```\nMore prose',
+      ],
+      body: sanitizedMap,
+    },
+    { outputs: ['```mermaid\nflowchart LR\n A-->B\n```', happyMap], body: happyMap },
+    { outputs: ['no fence', '```mermaid\nnotMindmap\n```'], body: '- Edited by the writer' },
+  ]) {
+    const callsBefore = modelCalls;
+    modelOutputs.push(...scenario.outputs);
+    const frames = events(
+      await (
+        await request(
+          base,
+          `/api/notes/${note.id}/ask`,
+          'POST',
+          { prompt: 'Map this', action: 'mindmap', selection: mapSource },
+          cookie,
+        )
+      ).text(),
+    );
+    assert.equal(modelCalls - callsBefore, scenario.outputs.length);
+    checkStatuses(frames);
+    assert.ok(frames.some((e) => e.event === 'status' && e.data.phase === 'drawing'));
+    assert.ok(!frames.some((e) => e.event === 'status' && e.data.phase === 'writing'));
+    const maps = frames.filter((e) => e.event === 'annotation');
+    assert.equal(maps.length, 1);
+    assert.equal(maps[0].data.annotation.kind, 'explain');
+    assert.equal(maps[0].data.annotation.body, scenario.body);
+    assert.equal(maps[0].data.annotation.status, 'open');
+    assert.equal(maps[0].data.annotation.anchor, mapSource);
+    assert.equal(maps[0].data.annotation.drawing, null);
+    assert.equal(
+      frames
+        .filter((e) => e.event === 'text')
+        .map((e) => e.data.delta)
+        .join(''),
+      scenario.body,
+    );
+    checks++;
+  }
   const { normalizeAnchor } = await import('../src/store.js');
   assert.equal(normalizeAnchor('**literal** and code', '**literal**'), '**literal**');
   assert.equal(normalizeAnchor('plain code', '`code`'), 'code');
@@ -695,6 +782,8 @@ try {
     ).json()
   ).settings;
   assert.deepEqual(liveSettings, {
+    askStyle: 'comment',
+    readAlongStyle: 'comment',
     model: 'smoke-background',
     effort: 'low',
     summary: 'auto',

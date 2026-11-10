@@ -16,7 +16,7 @@ export function registerAI(app: Hono<Env>) {
         .object({
           prompt: z.string().min(1).max(50000),
           selection: z.string().max(1000000).optional(),
-          action: z.enum(['ask', 'explain', 'draw', 'question']).optional(),
+          action: z.enum(['ask', 'explain', 'draw', 'question', 'mindmap']).optional(),
           riddlerId: idSchema.optional(),
         })
         .strict(),

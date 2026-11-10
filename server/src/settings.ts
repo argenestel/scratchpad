@@ -10,6 +10,8 @@ export const settingsSchema = z
   .object({
     model: z.string().min(1).max(200),
     effort: z.string().min(1).max(100),
+    askStyle: z.enum(['comment', 'block']),
+    readAlongStyle: z.enum(['comment', 'block']),
     summary: z.enum(['concise', 'detailed', 'auto', 'off']),
     backgroundModel: z.string().min(1).max(200).nullable(),
     backgroundEffort: z.string().min(1).max(100).nullable(),
@@ -21,6 +23,8 @@ function defaults(): Settings {
     model: config.model,
     effort: config.effort,
     summary: config.summary,
+    askStyle: 'comment',
+    readAlongStyle: 'comment',
     backgroundModel: null,
     backgroundEffort: null,
   };

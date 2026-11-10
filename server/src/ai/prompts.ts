@@ -6,3 +6,5 @@ export const reviewRules = `Decide whether to speak up. Output ONLY JSON {"speak
 export function instructions(note: Note, riddler?: Riddler) {
   return `${rules}\nPurpose: ${JSON.stringify(note.purpose)}\n${riddler ? `Persona (${riddler.name}): ${riddler.persona}` : ''}`;
 }
+
+export const mindmapRules = `Output ONLY a single fenced mermaid block using Mermaid mindmap syntax to summarize the note, or ONLY the selected passage when a selection is supplied. Start with the mindmap header, then root((Topic)) for the main topic, then indented children. Use 2–4 levels total and at most 30 nodes. Use short labels with no parentheses, brackets, quotes or colons inside labels. Do not add prose or JSON.`;

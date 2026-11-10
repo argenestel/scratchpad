@@ -138,3 +138,11 @@ The workflow's [checkout v4](https://github.com/actions/checkout/tree/v4) and
 [setup-node v4](https://github.com/actions/setup-node/tree/v4) use Node 22 for builds.
 No Cloudflare resources or production deployments are created merely by adding
 these files; deployment requires the account configuration and commands above.
+
+## v4 response styles and mind maps
+
+The Worker matches Node's response-style settings and mind map asks. Apply the new
+`0002_response_styles.sql` D1 migration with `npx wrangler d1 migrations apply DB --remote`
+before deploying; it backfills existing settings while preserving preferences.
+Node performs this backfill automatically at boot. Both styles default to `comment`;
+`block` insertion and annotation resolution are handled by the client.

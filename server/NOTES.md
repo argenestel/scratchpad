@@ -63,3 +63,9 @@ npm run smoke
 - Every status includes the effective model, effort, and phase. Foreground streams start with reading, then thinking when sent, writing on output, drawing for validated ink, and done immediately before the final annotation. Background runs retain their identity and exactly one final idle status with phase done.
 - Background overrides apply to both nudges and riddler jobs, resolving the older v2 description in favor of the v3 task. Foreground asks and replies use foreground preferences. Each run resolves preferences once.
 - Smoke tests retain prior coverage and add phase ordering, model/effort identity, anchor edge stripping, draw-to-Mermaid output, invalid Mermaid retry, and riddler overrides. All provider traffic is stubbed.
+
+## v4
+
+- Both backends validate and persist `askStyle` and `readAlongStyle` (`comment` by default, or `block`). Node backfills existing JSON settings rows at boot; Worker uses D1 migration `0002_response_styles.sql`. Block insertion and annotation resolution remain client responsibilities.
+- Mind map asks summarize the selection when supplied, otherwise the note. Both backends share the prompt and sanitizer: a single Mermaid mindmap fence, `root((Topic))`, indented children, 2–4 levels and at most 30 nodes. Labels retain letters, numbers, spaces, underscores, periods and hyphens. Surrounding prose is discarded. Invalid output retries once, then becomes a deterministic Markdown bullet outline of the source's nonempty lines (up to 30); empty source becomes `- Empty note`. The annotation stays kind `explain`, with drawing status during generation; only the sanitized result or fallback is streamed as text.
+- Tests cover existing-row migrations, style defaults/round trips/validation, stubbed mind map generation, sanitization, successful retry and outline fallback.

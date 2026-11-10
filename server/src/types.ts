@@ -116,6 +116,8 @@ export type ModelInfo = {
   efforts: Effort[];
 };
 export type Settings = {
+  askStyle: 'comment' | 'block';
+  readAlongStyle: 'comment' | 'block';
   model: string;
   effort: Effort;
   summary: 'concise' | 'detailed' | 'auto' | 'off';

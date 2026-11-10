@@ -1,3 +1,5 @@
+import { sanitizeMindmap, mindmapOutline } from '../../../server/src/ai/mindmap.js';
+import { mindmapRules } from '../../../server/src/ai/prompts.js';
 // Adapted from server/src/ai/engine.ts: asynchronous D1 storage and binding factories.
 import { z } from 'zod';
 const randomUUID = () => crypto.randomUUID();
@@ -206,7 +208,7 @@ export function createEngine(env: Bindings) {
     data: {
       prompt: string;
       selection?: string;
-      action?: 'ask' | 'explain' | 'draw' | 'question';
+      action?: 'ask' | 'explain' | 'draw' | 'question' | 'mindmap';
       riddlerId?: string;
     },
     emit: Emit,
@@ -227,61 +229,88 @@ export function createEngine(env: Bindings) {
     emit = statusEmitter(emit, options, { riddlerId: riddler?.id ?? null });
     await emit('status', { state: 'thinking', phase: 'reading' });
     let thinking = '';
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const result = await response(
-        uid,
-        instructions(note, riddler) +
-          (draw
-            ? '\n' + drawingRules
-            : '\nRespond directly in concise markdown. Prefer Mermaid in the Markdown body for technical diagrams. For other visuals, if an ink drawing would help, output ONLY a Drawing JSON object instead. ' +
-              drawingDescription +
-              ' Otherwise answer in markdown.'),
-        (await context(uid, note)) +
-          '\n' +
-          JSON.stringify(data) +
-          (attempt
-            ? '\nThe prior output was invalid. Return valid Drawing JSON, or Markdown containing a fenced mermaid block for a system/flow/sequence diagram.'
-            : ''),
-        async (event, value) => {
-          if (event === 'thinking' || !draw || (event === 'status' && value.state === 'thinking'))
-            await emit(event, { ...value, annotationId: a.id });
-        },
-        options,
-        undefined,
-        signal,
-      );
-      thinking += result.thinking;
-      const mermaid =
-        /(?:^|\n)```mermaid[^\S\r\n]*\r?\n\s*(?:flowchart\b|sequenceDiagram\b|stateDiagram-v2\b|erDiagram\b|classDiagram\b)[\s\S]+?\r?\n```(?:\s|$)/.test(
-          result.text,
+    if (data.action === 'mindmap') {
+      a.kind = 'explain';
+      await emit('status', { state: 'drawing', phase: 'drawing' });
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const result = await response(
+          uid,
+          instructions(note, riddler) + '\n' + mindmapRules,
+          JSON.stringify({ source: data.selection ?? note.content, prompt: data.prompt }) +
+            (attempt ? '\nThe prior output was invalid. Follow the mindmap syntax rules exactly.' : ''),
+          async (event, value) => {
+            if (event === 'thinking') await emit(event, { ...value, annotationId: a.id });
+          },
+          options,
+          undefined,
+          signal,
         );
-      if (draw && mermaid) {
-        a.kind = 'explain';
-        a.body = result.text;
-        await emit('status', { state: 'writing' });
-        await emit('text', { delta: a.body, annotationId: a.id });
-        break;
-      }
-      const isDrawing =
-        draw || (/^[\s`]*(?:json\s*)?\{/.test(result.text) && /"(?:viewBox|steps)"/.test(result.text));
-      if (isDrawing) {
-        try {
-          a.drawing = drawingSchema.parse(extractJSON(result.text));
-          await emit('status', { state: 'drawing' });
-          a.kind = 'drawing';
-          a.body = '';
+        thinking += result.thinking;
+        const body = sanitizeMindmap(result.text);
+        if (body) {
+          a.body = body;
           break;
-        } catch {
-          if (attempt === 1) {
-            a.kind = 'comment';
-            a.body = 'I could not prepare a valid drawing. Try a more specific drawing request.';
-            await emit('status', { state: 'writing' });
-            await emit('text', { delta: a.body, annotationId: a.id });
-          }
         }
-      } else {
-        a.body = result.text;
-        break;
+        if (attempt === 1) a.body = mindmapOutline(data.selection ?? note.content);
+      }
+      await emit('text', { delta: a.body, annotationId: a.id });
+    } else {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const result = await response(
+          uid,
+          instructions(note, riddler) +
+            (draw
+              ? '\n' + drawingRules
+              : '\nRespond directly in concise markdown. Prefer Mermaid in the Markdown body for technical diagrams. For other visuals, if an ink drawing would help, output ONLY a Drawing JSON object instead. ' +
+                drawingDescription +
+                ' Otherwise answer in markdown.'),
+          (await context(uid, note)) +
+            '\n' +
+            JSON.stringify(data) +
+            (attempt
+              ? '\nThe prior output was invalid. Return valid Drawing JSON, or Markdown containing a fenced mermaid block for a system/flow/sequence diagram.'
+              : ''),
+          async (event, value) => {
+            if (event === 'thinking' || !draw || (event === 'status' && value.state === 'thinking'))
+              await emit(event, { ...value, annotationId: a.id });
+          },
+          options,
+          undefined,
+          signal,
+        );
+        thinking += result.thinking;
+        const mermaid =
+          /(?:^|\n)```mermaid[^\S\r\n]*\r?\n\s*(?:flowchart\b|sequenceDiagram\b|stateDiagram-v2\b|erDiagram\b|classDiagram\b)[\s\S]+?\r?\n```(?:\s|$)/.test(
+            result.text,
+          );
+        if (draw && mermaid) {
+          a.kind = 'explain';
+          a.body = result.text;
+          await emit('status', { state: 'writing' });
+          await emit('text', { delta: a.body, annotationId: a.id });
+          break;
+        }
+        const isDrawing =
+          draw || (/^[\s`]*(?:json\s*)?\{/.test(result.text) && /"(?:viewBox|steps)"/.test(result.text));
+        if (isDrawing) {
+          try {
+            a.drawing = drawingSchema.parse(extractJSON(result.text));
+            await emit('status', { state: 'drawing' });
+            a.kind = 'drawing';
+            a.body = '';
+            break;
+          } catch {
+            if (attempt === 1) {
+              a.kind = 'comment';
+              a.body = 'I could not prepare a valid drawing. Try a more specific drawing request.';
+              await emit('status', { state: 'writing' });
+              await emit('text', { delta: a.body, annotationId: a.id });
+            }
+          }
+        } else {
+          a.body = result.text;
+          break;
+        }
       }
     }
     a.thinking = thinking || null;

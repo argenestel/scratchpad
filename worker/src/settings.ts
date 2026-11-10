@@ -11,6 +11,8 @@ export const settingsSchema = z
   .object({
     model: z.string().min(1).max(200),
     effort: z.string().min(1).max(100),
+    askStyle: z.enum(['comment', 'block']),
+    readAlongStyle: z.enum(['comment', 'block']),
     summary: z.enum(['concise', 'detailed', 'auto', 'off']),
     backgroundModel: z.string().min(1).max(200).nullable(),
     backgroundEffort: z.string().min(1).max(100).nullable(),
@@ -25,6 +27,8 @@ export function createSettings(env: Bindings) {
       model: config.model,
       effort: config.effort,
       summary: config.summary,
+      askStyle: 'comment',
+      readAlongStyle: 'comment',
       backgroundModel: null,
       backgroundEffort: null,
     };
