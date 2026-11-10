@@ -8,7 +8,7 @@ let mermaidLoad: Promise<typeof import('mermaid').default> | null = null;
 let mermaidSeq = 0;
 
 /** Renders a ```mermaid block. Lazy-loads mermaid; falls back to the source on error. */
-function Mermaid({ code }: { code: string }) {
+export function Mermaid({ code }: { code: string }) {
   const [svg, setSvg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => {

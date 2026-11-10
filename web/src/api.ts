@@ -19,8 +19,9 @@ export type Annotation = {
 };
 export type ModelInfo = { id: string; name: string; description: string; defaultEffort: string; efforts: string[] };
 export type Summary = 'concise' | 'detailed' | 'auto' | 'off';
-export type Settings = { model: string; effort: string; summary: Summary; backgroundModel: string | null; backgroundEffort: string | null };
-export type AskAction = 'ask' | 'explain' | 'draw' | 'question';
+export type ResponseStyle = 'comment' | 'block';
+export type Settings = { model: string; effort: string; summary: Summary; backgroundModel: string | null; backgroundEffort: string | null; askStyle?: ResponseStyle; readAlongStyle?: ResponseStyle };
+export type AskAction = 'ask' | 'explain' | 'draw' | 'question' | 'mindmap';
 
 type RunTag = { runId?: string; annotationId?: string; riddlerId?: string | null };
 export type StreamEvent =

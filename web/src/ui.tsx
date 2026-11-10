@@ -39,6 +39,8 @@ export const I = {
   panel: P(<><rect x="3" y="4" width="18" height="16" rx="3" /><path d="M15 4v16" /></>),
   copy: P(<><rect x="8" y="8" width="12" height="12" rx="3" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></>),
   sparkle: P(<path d="M12 3c.6 4.2 2.8 6.4 7 7-4.2.6-6.4 2.8-7 7-.6-4.2-2.8-6.4-7-7 4.2-.6 6.4-2.8 7-7zM19 16c.2 1.5 1 2.3 2.5 2.5-1.5.2-2.3 1-2.5 2.5-.2-1.5-1-2.3-2.5-2.5 1.5-.2 2.3-1 2.5-2.5z" />),
+  mindmap: P(<><circle cx="12" cy="12" r="2.5" /><circle cx="4.5" cy="6" r="2" /><circle cx="19.5" cy="6" r="2" /><circle cx="4.5" cy="18" r="2" /><circle cx="19.5" cy="18" r="2" /><path d="M10 11 6.3 7.2M14 11l3.7-3.8M10 13l-3.7 3.8M14 13l3.7 3.8" /></>),
+  doc: P(<><path d="M7 3h7l5 5v13H7z" /><path d="M14 3v5h5M10 13h6M10 17h6" /></>),
   stop: P(<rect x="7" y="7" width="10" height="10" rx="2" />),
 };
 

@@ -81,6 +81,19 @@ export function SettingsModal({ onClose, onChange }: { onClose: () => void; onCh
           </section>
 
           <section>
+            <div className="set-head"><h4>When scratchpad answers</h4><span className="sub">Leave a comment in the margin, or write straight into your note</span></div>
+            {([['askStyle', 'When you ask', 'Explain, Diagram, Quiz and Ask'], ['readAlongStyle', 'When it reads along', 'Things it notices on its own']] as const).map(([field, label, hint]) => (
+              <div key={field} className="style-row">
+                <div><b>{label}</b><span>{hint}</span></div>
+                <div className="seg" role="radiogroup" aria-label={label}>
+                  <button role="radio" aria-checked={(settings[field] ?? 'comment') === 'comment'} className={(settings[field] ?? 'comment') === 'comment' ? 'on' : ''} onClick={() => save({ [field]: 'comment' })}><I.chat size={13} /> Comment</button>
+                  <button role="radio" aria-checked={settings[field] === 'block'} className={settings[field] === 'block' ? 'on' : ''} onClick={() => save({ [field]: 'block' })}><I.doc size={13} /> Write into note</button>
+                </div>
+              </div>
+            ))}
+          </section>
+
+          <section>
             <div className="set-head"><h4>Read-along agent</h4><span className="sub">Runs in the background in “Thinks with you” mode. A lighter model keeps it quick.</span></div>
             <div className="row2">
               <label className="select">

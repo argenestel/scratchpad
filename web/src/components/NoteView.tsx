@@ -1,16 +1,21 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { api, type Annotation, type AskAction, type Mode, type ModelInfo, type Note, type Riddler, type Settings, type StreamEvent } from '../api';
+import { api, type Annotation, type AskAction, type Mode, type ModelInfo, type Note, type ResponseStyle, type Riddler, type Settings, type StreamEvent } from '../api';
 import type { AnchorSpec } from '../editor/anchors';
+import { toBlockMarkdown } from '../editor/aiblocks';
+import { noteToMindmap } from '../editor/mindmap';
 import { NoteEditor, type EditorHandle } from '../editor/NoteEditor';
+import { Mermaid } from './Md';
 import { I, INKS, Popover, toast } from '../ui';
+import { KIND_LABEL } from './AnnotationView';
 import { AnnotationView } from './AnnotationView';
 import { AskPalette } from './AskPalette';
 import { PurposeModal } from './PurposeModal';
 import { RunProgress, fmtSecs, secs, useTicker, type Phase, type Run } from './RunProgress';
 
-const KIND_FOR: Record<AskAction, Annotation['kind']> = { ask: 'comment', explain: 'explain', draw: 'drawing', question: 'question' };
+const KIND_FOR: Record<AskAction, Annotation['kind']> = { ask: 'comment', explain: 'explain', draw: 'drawing', question: 'question', mindmap: 'explain' };
 const DEFAULT_PROMPT: Record<AskAction, string> = {
   ask: 'What do you think?', explain: 'Explain this.', draw: 'Diagram this.', question: 'Ask me a question that tests whether I understand this.',
+  mindmap: 'Make a mind map of the ideas in this note.',
 };
 
 type PopoverState = { ids?: string[]; runKey?: string; getRect: () => DOMRect | null };
@@ -39,6 +44,10 @@ export function NoteView({ noteId, riddlers, onChanged, onDeleted, onOpenRiddler
   const [flash, setFlash] = useState<string | null>(null);
   const [fresh, setFresh] = useState<Set<string>>(new Set());
   const [ai, setAi] = useState<{ settings: Settings; model?: ModelInfo } | null>(null);
+  const [view, setView] = useState<'doc' | 'map'>('doc');
+  const aiRef = useRef<{ settings: Settings; model?: ModelInfo } | null>(null);
+  /** Requested response style per run key (foreground asks); background runs use the read-along default. */
+  const styleByRun = useRef(new Map<string, ResponseStyle>());
   const [bubbles, setBubbles] = useState<{ top: number; ids: string[]; color: string; fresh: boolean }[]>([]);
 
   const editorRef = useRef<EditorHandle>(null);
@@ -52,6 +61,7 @@ export function NoteView({ noteId, riddlers, onChanged, onDeleted, onOpenRiddler
   const pendingSave = useRef<Partial<Note>>({});
   const seq = useRef(0);
   noteRef.current = note;
+  aiRef.current = ai;
 
   const setPanelOpen = (v: boolean | ((p: boolean) => boolean)) =>
     setPanelOpenRaw((p) => { const n = typeof v === 'function' ? v(p) : v; savePref('dd-panel', n); return n; });
@@ -112,11 +122,24 @@ export function NoteView({ noteId, riddlers, onChanged, onDeleted, onOpenRiddler
         });
         break;
       case 'annotation': {
-        const a = e.annotation;
+        let a = e.annotation;
+        const style = styleByRun.current.get(key) ?? (pendingKey ? aiRef.current?.settings.askStyle : aiRef.current?.settings.readAlongStyle) ?? 'comment';
+        styleByRun.current.delete(key);
+        // "Write into the note": insert the answer as a scratchpad block and keep the comment under Done.
+        if (style === 'block' && a.status === 'open' && a.body.trim() && !a.drawing && a.replies.length === 0) {
+          const label = a.body.includes('```mermaid') && /^\s*```mermaid\s*\n\s*mindmap/m.test(a.body) ? 'Mind map' : KIND_LABEL[a.kind];
+          if (editorRef.current?.insertBlock(toBlockMarkdown(label, a.body), a.anchor)) {
+            a = { ...a, status: 'resolved' };
+            api.patchAnnotation(a.id, { status: 'resolved' }).catch(() => {});
+            setPop((p) => (p?.runKey === key ? null : p));
+            setPalette((p) => (p?.runKey === key ? null : p));
+            toast(`${label} added to your note`);
+          }
+        }
         setAnns((xs) => { const i = xs.findIndex((x) => x.id === a.id); if (i === -1) return [...xs, a]; const c = xs.slice(); c[i] = a; return c; });
         drop([a.id, key, `bg:${a.riddlerId ?? 'scratchpad'}`]);
-        setPop((p) => (p?.runKey && p.runKey === key ? { ids: [a.id], getRect: p.getRect } : p));
-        setPalette((p) => (p?.runKey && p.runKey === key ? { ...p, runKey: null, resultId: a.id } : p));
+        if (a.status === 'open') setPop((p) => (p?.runKey && p.runKey === key ? { ids: [a.id], getRect: p.getRect } : p));
+        if (a.status === 'open') setPalette((p) => (p?.runKey && p.runKey === key ? { ...p, runKey: null, resultId: a.id } : p));
         if (!pendingKey) {
           setFresh((f) => new Set(f).add(a.id));
           window.setTimeout(() => setFresh((f) => { const n = new Set(f); n.delete(a.id); return n; }), 6000);
@@ -228,10 +251,11 @@ export function NoteView({ noteId, riddlers, onChanged, onDeleted, onOpenRiddler
   };
 
   // ---------- asking ----------
-  const ask = async (action: AskAction, prompt: string, quote: string | null, riddlerId: string | null, via: 'inline' | 'palette', rect?: DOMRect | null) => {
+  const ask = async (action: AskAction, prompt: string, quote: string | null, riddlerId: string | null, via: 'inline' | 'palette', rect?: DOMRect | null, style?: ResponseStyle) => {
     const n = noteRef.current; if (!n) return;
     await flush();
     const key = `fg:${++seq.current}`;
+    styleByRun.current.set(key, action === 'mindmap' ? 'block' : style ?? ai?.settings.askStyle ?? 'comment');
     setRuns((r) => ({ ...r, [key]: { key, phase: 'reading', thinking: '', text: '', startedAt: Date.now(), anchor: quote, riddlerId, kind: KIND_FOR[action], background: false, model: ai?.model?.name ?? ai?.settings.model, effort: ai?.settings.effort } }));
     if (via === 'inline') setPop({ runKey: key, getRect: () => (quote ? editorRef.current?.rectOf(quote) ?? rect ?? null : rect ?? null) });
     else setPalette((p) => ({ quote: p?.quote ?? quote, runKey: key, resultId: null }));
@@ -319,6 +343,10 @@ export function NoteView({ noteId, riddlers, onChanged, onDeleted, onOpenRiddler
           <button role="radio" aria-checked={note.mode === 'thinks'} className={note.mode === 'thinks' ? 'on' : ''} onClick={() => setMode('thinks')} title="Reads along and speaks up when it matters">Thinks with you</button>
           <button role="radio" aria-checked={note.mode === 'ask'} className={note.mode === 'ask' ? 'on' : ''} onClick={() => setMode('ask')} title="Quiet until you ask">When you ask</button>
         </div>
+        <div className="seg" role="radiogroup" aria-label="View">
+          <button role="radio" aria-checked={view === 'doc'} className={view === 'doc' ? 'on' : ''} onClick={() => setView('doc')} title="Document"><I.doc size={14} /></button>
+          <button role="radio" aria-checked={view === 'map'} className={view === 'map' ? 'on' : ''} onClick={() => setView('map')} title="Mind map of this note"><I.mindmap size={14} /> <span className="hide-sm">Map</span></button>
+        </div>
         {working.length > 0 && (
           <Popover trigger={(t) => (
             <button className="activity" onClick={t} style={{ ['--c' as string]: colorOf(working[0].riddlerId) }}>
@@ -385,7 +413,12 @@ export function NoteView({ noteId, riddlers, onChanged, onDeleted, onOpenRiddler
 
       <div className="workspace">
         <div className="canvas" ref={canvasRef}>
-          <div className="doc-wrap" ref={wrapRef}>
+          {view === 'map' && (
+            <MindmapView title={note.title} content={note.content} getDoc={() => editorRef.current?.json() ?? null}
+              onInsert={(code) => { setView('doc'); window.setTimeout(() => { editorRef.current?.insertBlock(`\n\`\`\`mermaid\n${code}\n\`\`\`\n`, null); toast('Mind map added to the end of your note'); }, 50); }}
+              onAI={() => { setView('doc'); void ask('mindmap', '', null, null, 'palette'); }} />
+          )}
+          <div className="doc-wrap" ref={wrapRef} style={view === 'map' ? { display: 'none' } : undefined}>
             <textarea ref={titleRef} className="title-input" rows={1} placeholder="Untitled" value={note.title}
               onChange={(e) => update({ title: e.target.value })}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); editorRef.current?.focus(); } }} />
@@ -486,11 +519,40 @@ export function NoteView({ noteId, riddlers, onChanged, onDeleted, onOpenRiddler
       {palette && (
         <AskPalette quote={palette.quote} riddlers={riddlers} inkColor={note.inkColor} ai={ai}
           run={paletteRun} result={paletteResult}
-          onSubmit={(action, prompt, quote, rid) => { setPalette({ quote, runKey: null, resultId: null }); void ask(action, prompt, quote, rid, 'palette'); }}
+          defaultStyle={ai?.settings.askStyle ?? 'comment'}
+          runStyle={palette.runKey ? styleByRun.current.get(palette.runKey) : undefined}
+          onSubmit={(action, prompt, quote, rid, style) => { setPalette({ quote, runKey: null, resultId: null }); void ask(action, prompt, quote, rid, 'palette', null, style); }}
           onClose={() => setPalette(null)} onOpenSettings={onOpenSettings} onUpdate={upsert} onRemove={removeAnn} />
       )}
 
       {purposeOpen && <PurposeModal value={note.purpose} onClose={() => setPurposeOpen(false)} onSave={(p: string) => { update({ purpose: p }, { immediate: true }); setPurposeOpen(false); }} />}
+    </div>
+  );
+}
+
+/** Instant mind map of the note's structure (headings, lists, first lines), with AI and insert actions. */
+function MindmapView({ title, content, getDoc, onInsert, onAI }: {
+  title: string; content: string; getDoc: () => import('@tiptap/react').JSONContent | null;
+  onInsert: (code: string) => void; onAI: () => void;
+}) {
+  // content is a dependency so the map refreshes as the note changes.
+  const code = useMemo(() => { const d = getDoc(); return d ? noteToMindmap(title, d) : ''; /* eslint-disable-next-line */ }, [title, content]);
+  const empty = code.split('\n').length <= 2;
+  return (
+    <div className="map-view">
+      <div className="map-head">
+        <div>
+          <h2>Mind map</h2>
+          <p>Built from your headings, lists and first lines. Updates as you write.</p>
+        </div>
+        <div className="map-actions">
+          <button className="btn sm" onClick={() => onInsert(code)} disabled={empty}><I.plus /> Insert into note</button>
+          <button className="btn sm primary" onClick={onAI}><I.sparkle /> AI mind map</button>
+        </div>
+      </div>
+      {empty
+        ? <div className="panel-empty">Add a few headings or bullet points and they will branch out here. Or let the AI map the ideas for you.</div>
+        : <div className="map-canvas"><Mermaid code={code} /></div>}
     </div>
   );
 }

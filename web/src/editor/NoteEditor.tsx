@@ -3,7 +3,7 @@ import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
 import TaskItem from '@tiptap/extension-task-item';
 import TaskList from '@tiptap/extension-task-list';
-import { BubbleMenu, EditorContent, useEditor, type Editor } from '@tiptap/react';
+import { BubbleMenu, EditorContent, ReactNodeViewRenderer, useEditor, type Editor, type JSONContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { common, createLowlight } from 'lowlight';
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
@@ -11,6 +11,8 @@ import { Markdown } from 'tiptap-markdown';
 import type { AskAction } from '../api';
 import { I } from '../ui';
 import { AnchorHighlights, anchorKey, findText, type AnchorSpec } from './anchors';
+import { aiBlocks } from './aiblocks';
+import { CodeBlockView } from './CodeBlockView';
 import { slashCommand, type SlashItem } from './slash';
 
 const lowlight = createLowlight(common);
@@ -25,6 +27,10 @@ export type EditorHandle = {
   scrollTo(text: string): void;
   focus(): void;
   dom(): HTMLElement | null;
+  /** Document as TipTap JSON (for the mind map view). */
+  json(): JSONContent | null;
+  /** Insert an AI block after the block containing `afterText` (or at the end). Returns false if not inserted. */
+  insertBlock(markdown: string, afterText: string | null): boolean;
 };
 
 type Props = {
@@ -79,7 +85,8 @@ export const NoteEditor = forwardRef<EditorHandle, Props>(function NoteEditor(pr
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ codeBlock: false }),
-      CodeBlockLowlight.configure({ lowlight, defaultLanguage: null }),
+      CodeBlockLowlight.extend({ addNodeView: () => ReactNodeViewRenderer(CodeBlockView) }).configure({ lowlight, defaultLanguage: null }),
+      aiBlocks,
       Placeholder.configure({
         includeChildren: false,
         placeholder: ({ node, editor: ed }) =>
@@ -139,6 +146,16 @@ export const NoteEditor = forwardRef<EditorHandle, Props>(function NoteEditor(pr
     },
     focus: () => editor?.commands.focus(),
     dom: () => (editor ? (editor.view.dom as HTMLElement) : null),
+    json: () => editor?.getJSON() ?? null,
+    insertBlock(markdown, afterText) {
+      if (!editor || editor.isDestroyed) return false;
+      const { doc } = editor.state;
+      let pos = doc.content.size;
+      const hit = afterText ? findText(doc, afterText) : null;
+      if (hit) pos = doc.resolve(hit.from).after(1); // end of the top-level block holding the anchor
+      // tiptap-markdown parses Markdown strings passed to insertContentAt.
+      return editor.chain().insertContentAt(pos, markdown).run();
+    },
   }), [editor]);
 
   if (!editor) return null;

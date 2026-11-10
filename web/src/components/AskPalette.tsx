@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Annotation, AskAction, ModelInfo, Riddler, Settings } from '../api';
+import type { Annotation, AskAction, ModelInfo, ResponseStyle, Riddler, Settings } from '../api';
 import { I } from '../ui';
 import { AnnotationView } from './AnnotationView';
 import type { Run } from './RunProgress';
@@ -9,15 +9,18 @@ const ACTIONS: { id: AskAction; label: string; icon: keyof typeof ICONS; hint: s
   { id: 'explain', label: 'Explain', icon: 'bulb', hint: 'Walk me through it' },
   { id: 'draw', label: 'Diagram', icon: 'draw', hint: 'Sketch or flow diagram' },
   { id: 'question', label: 'Quiz me', icon: 'question', hint: 'Test my understanding' },
+  { id: 'mindmap', label: 'Mind map', icon: 'mindmap', hint: 'Map the ideas, written into the note' },
 ];
-const ICONS = { chat: I.chat, bulb: I.bulb, draw: I.draw, question: I.question };
+const ICONS = { chat: I.chat, bulb: I.bulb, draw: I.draw, question: I.question, mindmap: I.mindmap };
 
 /** ⌘K palette: type a question, watch scratchpad think, read the answer — all in one place. */
-export function AskPalette({ quote, riddlers, inkColor, ai, run, result, onSubmit, onClose, onOpenSettings, onUpdate, onRemove }: {
+export function AskPalette({ quote, riddlers, inkColor, ai, run, result, defaultStyle, runStyle, onSubmit, onClose, onOpenSettings, onUpdate, onRemove }: {
   quote: string | null; riddlers: Riddler[]; inkColor: string;
   ai: { settings: Settings; model?: ModelInfo } | null;
-  run: Run | null; result: Annotation | null;
-  onSubmit: (action: AskAction, prompt: string, quote: string | null, riddlerId: string | null) => void;
+  run: Run | null; result: Annotation | null; defaultStyle: ResponseStyle;
+  /** Where the running answer will go (known once a request is sent). */
+  runStyle?: ResponseStyle;
+  onSubmit: (action: AskAction, prompt: string, quote: string | null, riddlerId: string | null, style: ResponseStyle) => void;
   onClose: () => void; onOpenSettings: () => void;
   onUpdate: (a: Annotation) => void; onRemove: (id: string) => void;
 }) {
@@ -25,6 +28,7 @@ export function AskPalette({ quote, riddlers, inkColor, ai, run, result, onSubmi
   const [action, setAction] = useState<AskAction>('ask');
   const [as, setAs] = useState<string | null>(null);
   const [q, setQ] = useState(quote);
+  const [style, setStyle] = useState<ResponseStyle>(defaultStyle);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const busy = !!run || !!result;
   const riddler = riddlers.find((r) => r.id === (result?.riddlerId ?? run?.riddlerId ?? as));
@@ -38,7 +42,7 @@ export function AskPalette({ quote, riddlers, inkColor, ai, run, result, onSubmi
 
   const submit = () => {
     if (!prompt.trim() && !q) return;
-    onSubmit(action, prompt.trim(), q, as);
+    onSubmit(action, prompt.trim(), q, as, action === 'mindmap' ? 'block' : style);
   };
 
   return (
@@ -78,6 +82,10 @@ export function AskPalette({ quote, riddlers, inkColor, ai, run, result, onSubmi
                   {riddlers.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
                 </select>
               </label>
+              <div className="seg mini" role="radiogroup" aria-label="Reply as" title="Where the answer goes">
+                <button role="radio" aria-checked={style === 'comment'} className={style === 'comment' ? 'on' : ''} onClick={() => setStyle('comment')}><I.chat size={12} /> Comment</button>
+                <button role="radio" aria-checked={style === 'block'} className={style === 'block' ? 'on' : ''} onClick={() => setStyle('block')}><I.doc size={12} /> Into note</button>
+              </div>
               {ai && (
                 <button className="chip model-chip" onClick={onOpenSettings} title="Model & thinking">
                   <I.sliders size={13} /> {ai.model?.name ?? ai.settings.model} · {ai.settings.effort}
@@ -93,7 +101,7 @@ export function AskPalette({ quote, riddlers, inkColor, ai, run, result, onSubmi
               : run && <AnnotationView a={{ id: run.key, noteId: '', kind: run.kind, anchor: run.anchor, body: '', drawing: null, riddlerId: run.riddlerId, thinking: null, status: 'open', replies: [], createdAt: run.startedAt }}
                   run={run} riddler={riddler} inkColor={inkColor} onUpdate={onUpdate} onRemove={onRemove} />}
             <div className="palette-foot">
-              <span className="kbd-hint">{result ? 'Saved to this note.' : 'You can close this. The answer will be saved to the note.'}</span>
+              <span className="kbd-hint">{result ? 'Saved as a comment on this note.' : (runStyle ?? style) === 'block' ? 'You can close this. The answer will be written into your note.' : 'You can close this. The answer will be saved as a comment.'}</span>
               <button className="btn sm" onClick={onClose}>{result ? 'Done' : 'Run in background'}</button>
             </div>
           </div>
